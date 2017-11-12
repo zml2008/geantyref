@@ -137,10 +137,29 @@ public class GenericTypeReflectorTest extends AbstractGenericsReflectorTest {
         assertEquals(String.class, ((AnnotatedParameterizedType) componentType).getAnnotatedActualTypeArguments()[0].getType());
     }
 
+    public void testPartialReturnType() throws NoSuchMethodException {
+        Type type = TypeFactory.parameterizedClass(Q.class, String.class);
+        Method m = I.class.getDeclaredMethod("m", Object.class);
+        Type returnType = GenericTypeReflector.getReturnType(m, type);
+        assertTrue(returnType instanceof TypeVariable);
+        assertEquals(String.class, ((TypeVariable) returnType).getBounds()[0]);
+    }
+
+    public void testPartialParameterType() throws NoSuchMethodException {
+        Type type = TypeFactory.parameterizedClass(Q.class, Number.class);
+        Method m = Q.class.getDeclaredMethod("m", Object.class);
+        Type[] parameterTypes = GenericTypeReflector.getParameterTypes(m, type);
+        assertTrue(parameterTypes[0] instanceof TypeVariable);
+        assertEquals(Number.class, ((TypeVariable) parameterTypes[0]).getBounds()[0]);
+    }
+
     private class N {}
     private class P<S, K> extends N {}
     private class M<U, R> extends P<U, R> {}
     private class C<X, Y> extends M<Y, X> {}
     private class C1<X, Y, Z> extends M<Y, X> {}
     private static class D<T> { D(T t) {}}
+    private interface I<T> {<S extends T> S m(S s);}
+    private static class Q<G> implements I<G> { @Override public <S extends G> S m(S s) { return null; }
+    }
 }

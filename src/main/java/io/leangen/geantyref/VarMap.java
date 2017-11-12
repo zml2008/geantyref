@@ -19,9 +19,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import static io.leangen.geantyref.GenericTypeReflector.annotate;
-import static io.leangen.geantyref.GenericTypeReflector.merge;
-import static io.leangen.geantyref.GenericTypeReflector.updateAnnotations;
+import static io.leangen.geantyref.GenericTypeReflector.*;
 import static java.util.Arrays.stream;
 
 /**
@@ -31,6 +29,7 @@ import static java.util.Arrays.stream;
  * @author Bojan Tomic {@literal (veggen@gmail.com)}
  */
 class VarMap {
+
     private final Map<TypeVariable, AnnotatedType> map = new HashMap<>();
 
     /**
@@ -85,12 +84,24 @@ class VarMap {
     }
 
     AnnotatedType map(AnnotatedType type) {
+        return map(type, MappingMode.EXACT);
+    }
+
+    AnnotatedType map(AnnotatedType type, MappingMode mappingMode) {
         if (type.getType() instanceof Class) {
             return updateAnnotations(type, ((Class) type.getType()).getAnnotations());
         } else if (type instanceof AnnotatedTypeVariable) {
-            TypeVariable tv = (TypeVariable) type.getType();
+            TypeVariable<?> tv = (TypeVariable) type.getType();
             if (!map.containsKey(tv)) {
-                throw new UnresolvedTypeVariableException(tv);
+                if (mappingMode.equals(MappingMode.ALLOW_INCOMPLETE)) {
+                    AnnotatedTypeVariable variable = (AnnotatedTypeVariable) type;
+                    AnnotatedType[] bounds = map(variable.getAnnotatedBounds());
+                    Annotation[] merged = merge(variable.getAnnotations(), tv.getAnnotations());
+                    TypeVariableImpl v = new TypeVariableImpl<>(tv, merged, bounds);
+                    return new AnnotatedTypeVariableImpl(v, merged, bounds);
+                } else {
+                    throw new UnresolvedTypeVariableException(tv);
+                }
             }
             TypeVariable varFromClass = map.keySet().stream().filter(key -> key.equals(tv)).findFirst().get();
             Annotation[] merged = merge(type.getAnnotations(), tv.getAnnotations(), map.get(tv).getAnnotations(), varFromClass.getAnnotations());
@@ -141,5 +152,9 @@ class VarMap {
 
     Type map(Type type) {
         return map(annotate(type)).getType();
+    }
+
+    public enum MappingMode {
+        EXACT, ALLOW_INCOMPLETE
     }
 }

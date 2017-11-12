@@ -40,6 +40,7 @@ import static java.util.Arrays.stream;
  * @author Bojan Tomic {@literal (veggen@gmail.com)}
  */
 public class GenericTypeReflector {
+
     private static final WildcardType UNBOUND_WILDCARD = new WildcardTypeImpl(new Type[]{Object.class}, new Type[]{});
 
     /**
@@ -75,6 +76,10 @@ public class GenericTypeReflector {
      * @return toMapType, but with type parameters from typeAndParams replaced.
      */
     public static AnnotatedType mapTypeParameters(AnnotatedType toMapType, AnnotatedType typeAndParams) {
+        return mapTypeParameters(toMapType, typeAndParams, VarMap.MappingMode.EXACT);
+    }
+
+    private static AnnotatedType mapTypeParameters(AnnotatedType toMapType, AnnotatedType typeAndParams, VarMap.MappingMode mappingMode) {
         if (isMissingTypeParameters(typeAndParams.getType())) {
             return new AnnotatedTypeImpl(erase(toMapType.getType()), toMapType.getAnnotations());
         } else {
@@ -88,7 +93,7 @@ public class GenericTypeReflector {
                 Type owner = ((ParameterizedType) pType.getType()).getOwnerType();
                 handlingTypeAndParams = owner == null ? null : annotate(owner);
             }
-            return varMap.map(toMapType);
+            return varMap.map(toMapType, mappingMode);
         }
     }
 
@@ -205,7 +210,9 @@ public class GenericTypeReflector {
         Class<?> rawSuperType = erase(superType.getType());
         if (searchSubClass.isArray() && superType instanceof AnnotatedArrayType) {
             if (rawSuperType.isAssignableFrom(searchSubClass)) {
-                return AnnotatedArrayTypeImpl.createArrayType(getExactSubType(((AnnotatedArrayType) superType).getAnnotatedGenericComponentType(), searchSubClass.getComponentType()), new Annotation[0]);
+                return AnnotatedArrayTypeImpl.createArrayType(
+                        getExactSubType(((AnnotatedArrayType) superType).getAnnotatedGenericComponentType(), searchSubClass.getComponentType()),
+                        new Annotation[0]);
             } else {
                 return null;
             }
@@ -471,47 +478,126 @@ public class GenericTypeReflector {
     }
 
     /**
-     * Returns the exact return type of the given method in the given type.
-     * This may be different from {@code m.getGenericReturnType()} when the method was declared in a superclass,
+     * Resolves the exact return type of the given method in the given type.
+     * This may be different from {@code m.getAnnotatedReturnType()} when the method was declared in a superclass,
      * or {@code declaringType} has a type parameter that is used in the return type, or {@code declaringType} is a raw type.
      */
     public static AnnotatedType getExactReturnType(Method m, AnnotatedType declaringType) {
-        AnnotatedType returnType = m.getAnnotatedReturnType();
-        AnnotatedType exactDeclaringType = getExactSuperType(capture(declaringType), m.getDeclaringClass());
-        if (exactDeclaringType == null) { // capture(type) is not a subtype of m.getDeclaringClass()
-            throw new IllegalArgumentException("The method " + m + " is not a member of type " + declaringType);
-        }
-        return mapTypeParameters(returnType, exactDeclaringType);
+        return getReturnType(m, declaringType, VarMap.MappingMode.EXACT);
     }
 
+    /**
+     * Resolves the exact return type of the given method in the given type.
+     * This may be different from {@code m.getGenericReturnType()} when the method was declared in a superclass,
+     * or {@code declaringType} has a type parameter that is used in the return type, or {@code declaringType} is a raw type.
+     */
     public static Type getExactReturnType(Method m, Type declaringType) {
         return getExactReturnType(m, annotate(declaringType)).getType();
     }
 
     /**
-     * Returns the exact type of the given field in the given type.
-     * This may be different from {@code f.getGenericType()} when the field was declared in a superclass,
+     * Resolves the return type of the given method in the given type. Any unresolvable variables will be kept
+     * (in contrast to {@link #getExactReturnType(Method, AnnotatedType)}.
+     * This may be different from {@code m.getAnnotatedReturnType()} when the method was declared in a superclass,
+     * or {@code declaringType} has a type parameter that is used in the return type, or {@code declaringType} is a raw type.
+     */
+    public static AnnotatedType getReturnType(Method m, AnnotatedType declaringType) {
+        return getReturnType(m, declaringType, VarMap.MappingMode.ALLOW_INCOMPLETE);
+    }
+
+    /**
+     * Resolves the return type of the given method in the given type. Any unresolvable variables will be kept
+     * (in contrast to {@link #getExactReturnType(Method, Type)}.
+     * This may be different from {@code m.getGenericReturnType()} when the method was declared in a superclass,
+     * or {@code declaringType} has a type parameter that is used in the return type, or {@code declaringType} is a raw type.
+     */
+    public static Type getReturnType(Method m, Type declaringType) {
+        return getReturnType(m, annotate(declaringType)).getType();
+    }
+
+    private static AnnotatedType getReturnType(Method m, AnnotatedType declaringType, VarMap.MappingMode mappingMode) {
+        AnnotatedType returnType = m.getAnnotatedReturnType();
+        AnnotatedType exactDeclaringType = getExactSuperType(capture(declaringType), m.getDeclaringClass());
+        if (exactDeclaringType == null) { // capture(type) is not a subtype of m.getDeclaringClass()
+            throw new IllegalArgumentException("The method " + m + " is not a member of type " + declaringType);
+        }
+        return mapTypeParameters(returnType, exactDeclaringType, mappingMode);
+    }
+
+    /**
+     * Resolves the exact type of the given field in the given type.
+     * This may be different from {@code f.getAnnotatedType()} when the field was declared in a superclass,
      * or {@code declaringType} has a type parameter that is used in the type of the field, or {@code declaringType} is a raw type.
      */
     public static AnnotatedType getExactFieldType(Field f, AnnotatedType declaringType) {
-        AnnotatedType returnType = f.getAnnotatedType();
-        AnnotatedType exactDeclaringType = getExactSuperType(capture(declaringType), f.getDeclaringClass());
-        if (exactDeclaringType == null) { // capture(type) is not a subtype of f.getDeclaringClass()
-            throw new IllegalArgumentException("The field " + f + " is not a member of type " + declaringType);
-        }
-        return mapTypeParameters(returnType, exactDeclaringType);
+        return getFieldType(f, declaringType, VarMap.MappingMode.EXACT);
     }
 
+    /**
+     * Resolves the exact type of the given field in the given type.
+     * This may be different from {@code f.getGenericType()} when the field was declared in a superclass,
+     * or {@code declaringType} has a type parameter that is used in the type of the field, or {@code declaringType} is a raw type.
+     */
     public static Type getExactFieldType(Field f, Type type) {
         return getExactFieldType(f, annotate(type)).getType();
     }
 
     /**
-     * Returns the exact annotated parameter types of the given method/constructor in the given type.
+     * Resolves the type of the given field in the given type. Any unresolvable variables will be kept
+     * (in contrast to {@link #getExactFieldType(Field, AnnotatedType)}).
+     * This may be different from {@code f.getAnnotatedType()} when the field was declared in a superclass,
+     * or {@code declaringType} has a type parameter that is used in the type of the field, or {@code declaringType} is a raw type.
+     */
+    public static AnnotatedType getFieldType(Field f, AnnotatedType declaringType) {
+        return getFieldType(f, declaringType, VarMap.MappingMode.ALLOW_INCOMPLETE);
+    }
+
+    /**
+     * Resolves the type of the given field in the given type. Any unresolvable variables will be kept
+     * (in contrast to {@link #getExactFieldType(Field, Type)}).
+     * This may be different from {@code f.getGenericType()} when the field was declared in a superclass,
+     * or {@code declaringType} has a type parameter that is used in the type of the field, or {@code declaringType} is a raw type.
+     */
+    public static Type getFieldType(Field f, Type type) {
+        return getFieldType(f, annotate(type)).getType();
+    }
+
+    private static AnnotatedType getFieldType(Field f, AnnotatedType declaringType, VarMap.MappingMode mappingMode) {
+        AnnotatedType returnType = f.getAnnotatedType();
+        AnnotatedType exactDeclaringType = getExactSuperType(capture(declaringType), f.getDeclaringClass());
+        if (exactDeclaringType == null) { // capture(type) is not a subtype of f.getDeclaringClass()
+            throw new IllegalArgumentException("The field " + f + " is not a member of type " + declaringType);
+        }
+        return mapTypeParameters(returnType, exactDeclaringType, mappingMode);
+    }
+
+    /**
+     * Resolves the exact annotated parameter types of the given method/constructor in the given type.
      * This may be different from {@code exe.getAnnotatedParameterTypes()} when the method was declared in a superclass,
      * or {@code declaringType} has a type parameter that is used in one of the parameters, or {@code declaringType} is a raw type.
      */
     public static AnnotatedType[] getExactParameterTypes(Executable exe, AnnotatedType declaringType) {
+        return getParameterTypes(exe, declaringType, VarMap.MappingMode.EXACT);
+    }
+
+    /**
+     * Resolves the exact parameter types of the given method/constructor in the given type.
+     * This may be different from {@code exe.getParameterTypes()} when the method was declared in a superclass,
+     * or {@code declaringType} has a type parameter that is used in one of the parameters, or {@code declaringType} is a raw type.
+     */
+    public static Type[] getExactParameterTypes(Executable exe, Type declaringType) {
+        return stream(getExactParameterTypes(exe, annotate(declaringType))).map(AnnotatedType::getType).toArray(Type[]::new);
+    }
+
+    public static AnnotatedType[] getParameterTypes(Executable exe, AnnotatedType declaringType) {
+        return getParameterTypes(exe, declaringType, VarMap.MappingMode.ALLOW_INCOMPLETE);
+    }
+
+    public static Type[] getParameterTypes(Executable exe, Type declaringType) {
+        return stream(getParameterTypes(exe, annotate(declaringType))).map(AnnotatedType::getType).toArray(Type[]::new);
+    }
+
+    private static AnnotatedType[] getParameterTypes(Executable exe, AnnotatedType declaringType, VarMap.MappingMode mappingMode) {
         AnnotatedType[] parameterTypes = exe.getAnnotatedParameterTypes();
         AnnotatedType exactDeclaringType = getExactSuperType(capture(declaringType), exe.getDeclaringClass());
         if (exactDeclaringType == null) { // capture(type) is not a subtype of exe.getDeclaringClass()
@@ -520,18 +606,9 @@ public class GenericTypeReflector {
 
         AnnotatedType[] result = new AnnotatedType[parameterTypes.length];
         for (int i = 0; i < parameterTypes.length; i++) {
-            result[i] = mapTypeParameters(parameterTypes[i], exactDeclaringType);
+            result[i] = mapTypeParameters(parameterTypes[i], exactDeclaringType, mappingMode);
         }
         return result;
-    }
-
-    /**
-     * Returns the exact parameter types of the given method/constructor in the given type.
-     * This may be different from {@code exe.getParameterTypes()} when the method was declared in a superclass,
-     * or {@code declaringType} has a type parameter that is used in one of the parameters, or {@code declaringType} is a raw type.
-     */
-    public static Type[] getExactParameterTypes(Executable exe, Type declaringType) {
-        return stream(getExactParameterTypes(exe, annotate(declaringType))).map(AnnotatedType::getType).toArray(Type[]::new);
     }
 
     /**
@@ -831,7 +908,7 @@ public class GenericTypeReflector {
                 .reduce((x,y) -> x ^ y);
         return 31 * typeHash.orElse(0) ^ annotationHash.orElse(0);
     }
-    
+
     /**
      * Checks whether the two provided types are of the same structure and annotations on all levels.
      *
