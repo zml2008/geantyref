@@ -53,7 +53,7 @@ All functionality of the library is exposed via a handful of classes:
 <dependency>
     <groupId>io.leangen.geantyref</groupId>
     <artifactId>geantyref</artifactId>
-    <version>1.2.1</version>
+    <version>1.3.0</version>
 </dependency>
 ```
 
