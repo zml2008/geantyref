@@ -67,7 +67,7 @@ class AnnotatedTypeImpl implements AnnotatedType {
 
     @Override
     public int hashCode() {
-        return 31 * (this.getType().hashCode() ^ Arrays.hashCode(this.getAnnotations()));
+        return 127 * this.getType().hashCode() ^ Arrays.hashCode(this.getAnnotations());
     }
 
     @Override

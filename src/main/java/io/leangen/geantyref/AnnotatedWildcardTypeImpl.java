@@ -53,14 +53,14 @@ class AnnotatedWildcardTypeImpl extends AnnotatedTypeImpl implements AnnotatedWi
 
     @Override
     public int hashCode() {
-        return 31 * super.hashCode() ^ GenericTypeReflector.hashCode(lowerBounds) ^ GenericTypeReflector.hashCode(upperBounds);
+        return 127 * super.hashCode() ^ (GenericTypeReflector.hashCode(lowerBounds) + GenericTypeReflector.hashCode(upperBounds));
     }
 
     @Override
     public String toString() {
         if (lowerBounds.length > 0) {
             return annotationsString() + "? super " + typesString(lowerBounds);
-        } else if (upperBounds.length == 0 && upperBounds[0].getType() == Object.class) {
+        } else if (upperBounds.length == 0 || upperBounds[0].getType() == Object.class) {
             return annotationsString() + "?";
         } else {
             return annotationsString() + "? extends " + typesString(upperBounds);

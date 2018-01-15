@@ -45,10 +45,7 @@ class ParameterizedTypeImpl implements ParameterizedType {
 
     @Override
     public int hashCode() {
-        int result = rawType.hashCode() ^ Arrays.hashCode(actualTypeArguments);
-        if (ownerType != null)
-            result ^= ownerType.hashCode();
-        return result;
+        return  127 * (rawType.hashCode() + (ownerType != null ? ownerType.hashCode() : 0)) ^ Arrays.hashCode(actualTypeArguments);
     }
 
     @Override

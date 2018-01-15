@@ -62,8 +62,7 @@ class AnnotatedCaptureTypeImpl implements AnnotatedCaptureType {
      * other: we need the capture of the argument.
      */
     void init(VarMap varMap) {
-        ArrayList<AnnotatedType> upperBoundsList = new ArrayList<>();
-        upperBoundsList.addAll(Arrays.asList(varMap.map(variable.getAnnotatedBounds())));
+        ArrayList<AnnotatedType> upperBoundsList = new ArrayList<>(Arrays.asList(varMap.map(variable.getAnnotatedBounds())));
 
         List<AnnotatedType> wildcardUpperBounds = Arrays.asList(wildcard.getAnnotatedUpperBounds());
         if (wildcardUpperBounds.size() > 0 && wildcardUpperBounds.get(0).getType() == Object.class) {
@@ -139,7 +138,7 @@ class AnnotatedCaptureTypeImpl implements AnnotatedCaptureType {
 
     @Override
     public int hashCode() {
-        return wildcard.hashCode() ^ variable.hashCode();
+        return 127 * wildcard.hashCode() ^ variable.hashCode();
     }
 
     @Override

@@ -37,7 +37,7 @@ class AnnotatedArrayTypeImpl extends AnnotatedTypeImpl implements AnnotatedArray
 
     @Override
     public int hashCode() {
-        return super.hashCode() ^ componentType.hashCode();
+        return 127 * super.hashCode() ^ componentType.hashCode();
     }
 
     @Override

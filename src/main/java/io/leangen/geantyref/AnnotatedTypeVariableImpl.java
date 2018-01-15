@@ -49,7 +49,7 @@ class AnnotatedTypeVariableImpl extends AnnotatedTypeImpl implements AnnotatedTy
 
     @Override
     public int hashCode() {
-        return super.hashCode() ^ GenericTypeReflector.hashCode(annotatedBounds);
+        return 127 * super.hashCode() ^ GenericTypeReflector.hashCode(annotatedBounds);
     }
 
     @Override
