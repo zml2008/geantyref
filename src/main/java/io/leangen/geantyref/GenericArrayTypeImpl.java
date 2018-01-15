@@ -41,7 +41,7 @@ class GenericArrayTypeImpl implements GenericArrayType {
 
     @Override
     public int hashCode() {
-        return componentType.hashCode() * 7;
+        return 127 * componentType.hashCode();
     }
 
     @Override

@@ -27,7 +27,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.OptionalInt;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -67,6 +66,19 @@ public class GenericTypeReflector {
         } else {
             throw new RuntimeException("not supported: " + type.getClass());
         }
+    }
+
+    public static boolean isFullyBound(Type type) {
+        if (type instanceof Class) {
+            return true;
+        }
+        if (type instanceof ParameterizedType) {
+            return Arrays.stream(((ParameterizedType) type).getActualTypeArguments()).allMatch(GenericTypeReflector::isFullyBound);
+        }
+        if (type instanceof GenericArrayType) {
+            return isFullyBound(((GenericArrayType) type).getGenericComponentType());
+        }
+        return false;
     }
 
     /**
@@ -312,6 +324,7 @@ public class GenericTypeReflector {
                 return isSuperType(superComponentType, mappedSubComponentType);
             } else {
                 assert mappedSubType instanceof ParameterizedType;
+                assert superType instanceof ParameterizedType;
                 ParameterizedType pMappedSubType = (ParameterizedType) mappedSubType;
                 assert pMappedSubType.getRawType() == superClass;
                 ParameterizedType pSuperType = (ParameterizedType)superType;
@@ -852,6 +865,7 @@ public class GenericTypeReflector {
      * by with all of its type parameters replaced by {@code typeParameters}.
      * @param type The original parameterized type from which the raw class is to be taken
      * @param typeParameters The new type parameters to use
+     *
      * @return The new parameterized type
      */
     public static AnnotatedParameterizedType replaceParameters(AnnotatedParameterizedType type, AnnotatedType[] typeParameters) {
@@ -872,10 +886,25 @@ public class GenericTypeReflector {
         return replaceAnnotations(type, type.getAnnotations());
     }
 
+
+    /**
+     * Returns an {@link AnnotatedType} functionally identical to the given one, but in a canonical form that
+     * implements {@code equals} and {@code hashCode}. If the given type is already in the canonical form,
+     * the same instance will be returned.
+     *
+     * @param type The type to turn into the canonical form
+     *
+     * @return A type functionally equivalent to the given one, but in the canonical form
+     */
+    public static AnnotatedType toCanonical(AnnotatedType type) {
+        return type instanceof AnnotatedTypeImpl ? type : clone(type);
+    }
+
     /**
      * Merges an arbitrary number of annotations arrays, and removes duplicates.
      *
      * @param annotations Annotation arrays to merge and deduplicate
+     *
      * @return An array containing all annotations from the given arrays, without duplicates
      */
     public static Annotation[] merge(Annotation[]... annotations) {
@@ -899,14 +928,14 @@ public class GenericTypeReflector {
     }
 
     public static int hashCode(AnnotatedType... types) {
-        OptionalInt typeHash = Arrays.stream(types)
+        int typeHash = Arrays.stream(types)
                 .mapToInt(t -> t.getType().hashCode())
-                .reduce((x,y) -> x ^ y);
-        OptionalInt annotationHash = Arrays.stream(types)
+                .reduce(0, (x,y) -> 127 * x ^ y);
+        int annotationHash = Arrays.stream(types)
                 .flatMap(t -> Arrays.stream(t.getAnnotations()))
-                .mapToInt(Annotation::hashCode)
-                .reduce((x,y) -> x ^ y);
-        return 31 * typeHash.orElse(0) ^ annotationHash.orElse(0);
+                .mapToInt(a -> 31 * a.annotationType().hashCode() ^ a.hashCode())
+                .reduce(0, (x,y) -> 127 * x ^ y);
+        return 31 * typeHash ^ annotationHash;
     }
 
     /**

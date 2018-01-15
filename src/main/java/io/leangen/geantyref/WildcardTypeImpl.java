@@ -39,7 +39,7 @@ class WildcardTypeImpl implements WildcardType {
 
     @Override
     public int hashCode() {
-        return Arrays.hashCode(lowerBounds) ^ Arrays.hashCode(upperBounds);
+        return 127 * Arrays.hashCode(lowerBounds) ^ Arrays.hashCode(upperBounds);
     }
 
     @Override

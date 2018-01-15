@@ -87,10 +87,8 @@ public class TypeVariableImpl<D extends GenericDeclaration> implements TypeVaria
 
     @Override
     public int hashCode() {
-        return 31 * (this.getName().hashCode()
-                ^ Arrays.hashCode(this.getBounds())
-                ^ this.getGenericDeclaration().hashCode()
-                ^ Arrays.hashCode(this.getAnnotations()));
+        return 127 * (this.getName().hashCode() + Arrays.hashCode(this.getBounds()))
+                ^ (this.getGenericDeclaration().hashCode() + Arrays.hashCode(this.getAnnotations()));
     }
 
     @Override

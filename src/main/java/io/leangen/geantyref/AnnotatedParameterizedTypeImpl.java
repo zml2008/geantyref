@@ -36,7 +36,7 @@ class AnnotatedParameterizedTypeImpl extends AnnotatedTypeImpl implements Annota
 
     @Override
     public int hashCode() {
-        return 31 * super.hashCode() ^ GenericTypeReflector.hashCode(typeArguments);
+        return 127 * super.hashCode() ^ GenericTypeReflector.hashCode(typeArguments);
     }
 
     @Override
