@@ -29,9 +29,9 @@ import static io.leangen.geantyref.GenericTypeReflector.toCanonical;
  *
  * @param <V> the type of mapped values
  */
-public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
+public class AnnotatedTypeMap<K extends AnnotatedType, V> implements Map<K, V> {
 
-    private final Map<AnnotatedType, V> inner;
+    private final Map<K, V> inner;
 
     /**
      * Constructs an instance backed by a {@link HashMap}
@@ -45,7 +45,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      *
      * @param inner A non-null map instance that will back the constructed {@code AnnotatedTypeMap}
      */
-    public AnnotatedTypeMap(Map<AnnotatedType, V> inner) {
+    public AnnotatedTypeMap(Map<K, V> inner) {
         Objects.requireNonNull(inner);
         if (!inner.isEmpty()) {
             throw new IllegalArgumentException("The provided map must be empty");
@@ -82,7 +82,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      */
     @Override
     public boolean containsValue(Object value) {
-        return false;
+        return inner.containsValue(value);
     }
 
     /**
@@ -97,7 +97,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public V put(AnnotatedType key, V value) {
+    public V put(K key, V value) {
         return inner.put(toCanonical(key), value);
     }
 
@@ -113,8 +113,8 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public void putAll(Map<? extends AnnotatedType, ? extends V> m) {
-        Map<? extends AnnotatedType, ? extends V> canonical =  m.entrySet().stream()
+    public void putAll(Map<? extends K, ? extends V> m) {
+        Map<? extends K, ? extends V> canonical =  m.entrySet().stream()
                 .map(e -> new AbstractMap.SimpleEntry<>(toCanonical(e.getKey()), e.getValue()))
                 .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue));
         inner.putAll(canonical);
@@ -132,7 +132,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public Set<AnnotatedType> keySet() {
+    public Set<K> keySet() {
         return inner.keySet();
     }
 
@@ -148,7 +148,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public Set<Entry<AnnotatedType, V>> entrySet() {
+    public Set<Entry<K, V>> entrySet() {
         return inner.entrySet();
     }
 
@@ -181,7 +181,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public void forEach(BiConsumer<? super AnnotatedType, ? super V> action) {
+    public void forEach(BiConsumer<? super K, ? super V> action) {
         inner.forEach(action);
     }
 
@@ -189,7 +189,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public void replaceAll(BiFunction<? super AnnotatedType, ? super V, ? extends V> function) {
+    public void replaceAll(BiFunction<? super K, ? super V, ? extends V> function) {
         inner.replaceAll(function);
     }
 
@@ -197,7 +197,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public V putIfAbsent(AnnotatedType key, V value) {
+    public V putIfAbsent(K key, V value) {
         return inner.putIfAbsent(toCanonical(key), value);
     }
 
@@ -213,7 +213,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public boolean replace(AnnotatedType key, V oldValue, V newValue) {
+    public boolean replace(K key, V oldValue, V newValue) {
         return inner.replace(toCanonical(key), oldValue, newValue);
     }
 
@@ -221,7 +221,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public V replace(AnnotatedType key, V value) {
+    public V replace(K key, V value) {
         return inner.replace(toCanonical(key), value);
     }
 
@@ -229,7 +229,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public V computeIfAbsent(AnnotatedType key, Function<? super AnnotatedType, ? extends V> mappingFunction) {
+    public V computeIfAbsent(K key, Function<? super K, ? extends V> mappingFunction) {
         return inner.computeIfAbsent(toCanonical(key), mappingFunction);
     }
 
@@ -237,7 +237,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public V computeIfPresent(AnnotatedType key, BiFunction<? super AnnotatedType, ? super V, ? extends V> remappingFunction) {
+    public V computeIfPresent(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
         return inner.computeIfPresent(toCanonical(key), remappingFunction);
     }
 
@@ -245,7 +245,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public V compute(AnnotatedType key, BiFunction<? super AnnotatedType, ? super V, ? extends V> remappingFunction) {
+    public V compute(K key, BiFunction<? super K, ? super V, ? extends V> remappingFunction) {
         return inner.compute(toCanonical(key), remappingFunction);
     }
 
@@ -253,7 +253,7 @@ public class AnnotatedTypeMap<V> implements Map<AnnotatedType, V> {
      * {@inheritDoc}
      */
     @Override
-    public V merge(AnnotatedType key, V value, BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
+    public V merge(K key, V value, BiFunction<? super V, ? super V, ? extends V> remappingFunction) {
         return inner.merge(toCanonical(key), value, remappingFunction);
     }
 }

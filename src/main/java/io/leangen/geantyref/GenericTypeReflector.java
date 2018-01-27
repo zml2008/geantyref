@@ -817,31 +817,32 @@ public class GenericTypeReflector {
      *
      * @return A type of the same structure as the original but with replaced annotations
      */
-    public static AnnotatedType replaceAnnotations(AnnotatedType original, Annotation[] annotations) {
+    @SuppressWarnings("unchecked")
+    public static <T extends AnnotatedType> T replaceAnnotations(T original, Annotation[] annotations) {
         if (original instanceof AnnotatedParameterizedType) {
-            return new AnnotatedParameterizedTypeImpl((ParameterizedType) original.getType(), annotations,
+            return (T) new AnnotatedParameterizedTypeImpl((ParameterizedType) original.getType(), annotations,
                     ((AnnotatedParameterizedType) original).getAnnotatedActualTypeArguments());
         }
         if (original instanceof AnnotatedCaptureType) {
-            return new AnnotatedCaptureTypeImpl(
+            return (T) new AnnotatedCaptureTypeImpl(
                     ((AnnotatedCaptureType) original).getAnnotatedWildcardType(),
                     ((AnnotatedCaptureType) original).getAnnotatedTypeVariable(),
                     ((AnnotatedCaptureType) original).getAnnotatedUpperBounds(),
                     annotations);
         }
         if (original instanceof AnnotatedWildcardType) {
-            return new AnnotatedWildcardTypeImpl((WildcardType) original.getType(), annotations,
+            return (T) new AnnotatedWildcardTypeImpl((WildcardType) original.getType(), annotations,
                     ((AnnotatedWildcardType) original).getAnnotatedLowerBounds(),
                     ((AnnotatedWildcardType) original).getAnnotatedUpperBounds());
         }
         if (original instanceof AnnotatedTypeVariable) {
-            return new AnnotatedTypeVariableImpl((TypeVariable<?>) original.getType(), annotations);
+            return (T) new AnnotatedTypeVariableImpl((TypeVariable<?>) original.getType(), annotations);
         }
         if (original instanceof AnnotatedArrayType) {
-            return new AnnotatedArrayTypeImpl(original.getType(), annotations,
+            return (T) new AnnotatedArrayTypeImpl(original.getType(), annotations,
                     ((AnnotatedArrayType) original).getAnnotatedGenericComponentType());
         }
-        return new AnnotatedTypeImpl(original.getType(), annotations);
+        return (T) new AnnotatedTypeImpl(original.getType(), annotations);
     }
 
     /**
@@ -853,7 +854,7 @@ public class GenericTypeReflector {
      *
      * @return A type of the same structure as the original but with replaced annotations
      */
-    public static AnnotatedType updateAnnotations(AnnotatedType original, Annotation[] annotations) {
+    public static <T extends AnnotatedType> T updateAnnotations(T original, Annotation[] annotations) {
         if (annotations == null || annotations.length == 0 || Arrays.equals(original.getAnnotations(), annotations)) {
             return original;
         }
@@ -882,7 +883,7 @@ public class GenericTypeReflector {
      *
      * @return A type of the same structure and with the same annotation as the provided one
      */
-    public static AnnotatedType clone(AnnotatedType type) {
+    public static <T extends AnnotatedType> T clone(T type) {
         return replaceAnnotations(type, type.getAnnotations());
     }
 
@@ -896,7 +897,7 @@ public class GenericTypeReflector {
      *
      * @return A type functionally equivalent to the given one, but in the canonical form
      */
-    public static AnnotatedType toCanonical(AnnotatedType type) {
+    public static <T extends AnnotatedType> T toCanonical(T type) {
         return type instanceof AnnotatedTypeImpl ? type : clone(type);
     }
 
