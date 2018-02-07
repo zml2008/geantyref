@@ -876,29 +876,78 @@ public class GenericTypeReflector {
     }
 
     /**
-     * Creates a new {@link AnnotatedType} of the same structure and with the same annotations as the
-     * provided one.
-     *
-     * @param type The type from which the structure and annotations are to be copied
-     *
-     * @return A type of the same structure and with the same annotation as the provided one
-     */
-    public static <T extends AnnotatedType> T clone(T type) {
-        return replaceAnnotations(type, type.getAnnotations());
-    }
-
-
-    /**
      * Returns an {@link AnnotatedType} functionally identical to the given one, but in a canonical form that
-     * implements {@code equals} and {@code hashCode}. If the given type is already in the canonical form,
-     * the same instance will be returned.
+     * implements {@code equals} and {@code hashCode}.
      *
      * @param type The type to turn into the canonical form
      *
      * @return A type functionally equivalent to the given one, but in the canonical form
      */
     public static <T extends AnnotatedType> T toCanonical(T type) {
-        return type instanceof AnnotatedTypeImpl ? type : clone(type);
+        return toCanonical(type, new HashMap<>());
+    }
+
+    /**
+     * This is the method underlying {@link #toCanonical(AnnotatedType)}.
+     * If goes recursively through the structure of the provided {@link AnnotatedType} turning all type parameters,
+     * bounds etc encountered into their canonical forms, with a special treatment for {@link AnnotatedCaptureType}
+     * which can have infinitely recursive structure by having itself as its upper bound.
+     *
+     * @param type The type to annotate
+     * @param cache The cache for already encountered {@link AnnotatedCaptureType}s. Necessary because
+     *       {@link AnnotatedCaptureType}s can have infinitely recursive structure.
+     *
+     * @return Type whose structure has been recursively annotated
+     *
+     * <p>See {@link #toCanonical(AnnotatedType)}</p>
+     * <p>See {@link AnnotatedCaptureCacheKey}</p>
+     * <p>See {@link AnnotatedCaptureType}</p>
+     * <p>See {@link CaptureType}</p>
+     */
+    @SuppressWarnings("unchecked")
+    private static <T extends AnnotatedType> T toCanonical(T type, Map<AnnotatedCaptureCacheKey, AnnotatedType> cache) {
+        if (type instanceof AnnotatedParameterizedType) {
+            AnnotatedType[] params = Arrays.stream(((AnnotatedParameterizedType) type).getAnnotatedActualTypeArguments())
+                    .map(param -> toCanonical(param, cache))
+                    .toArray(AnnotatedType[]::new);
+            return (T) new AnnotatedParameterizedTypeImpl((ParameterizedType) type.getType(), type.getAnnotations(), params);
+        }
+        if (type instanceof AnnotatedCaptureType) {
+            AnnotatedCaptureType captureType = (AnnotatedCaptureType) type;
+            AnnotatedCaptureCacheKey key = new AnnotatedCaptureCacheKey(captureType);
+            if (cache.containsKey(key)) {
+                return (T) cache.get(key);
+            }
+            AnnotatedCaptureType annotatedCapture = new AnnotatedCaptureTypeImpl(
+                    toCanonical(captureType.getAnnotatedWildcardType(), cache),
+                    toCanonical(captureType.getAnnotatedTypeVariable(), cache),
+                    null, captureType.getAnnotations());
+            cache.put(key, annotatedCapture);
+            AnnotatedType[] upperBounds = Arrays.stream(captureType.getAnnotatedUpperBounds())
+                    .map(bound -> toCanonical(bound, cache))
+                    .toArray(AnnotatedType[]::new);
+            annotatedCapture.setAnnotatedUpperBounds(upperBounds); //complete the type
+            return (T) annotatedCapture;
+        }
+        if (type instanceof AnnotatedWildcardType) {
+            AnnotatedWildcardType wildcardType = (AnnotatedWildcardType) type;
+            AnnotatedType[] lowerBounds = Arrays.stream(wildcardType.getAnnotatedLowerBounds())
+                    .map(bound -> toCanonical(bound, cache))
+                    .toArray(AnnotatedType[]::new);
+            AnnotatedType[] upperBounds = Arrays.stream(wildcardType.getAnnotatedUpperBounds())
+                    .map(bound -> toCanonical(bound, cache))
+                    .toArray(AnnotatedType[]::new);
+            return (T) new AnnotatedWildcardTypeImpl((WildcardType) wildcardType.getType(), wildcardType.getAnnotations(),
+                    lowerBounds, upperBounds);
+        }
+        if (type instanceof AnnotatedTypeVariable) {
+            return (T) new AnnotatedTypeVariableImpl((TypeVariable<?>) type.getType(), type.getAnnotations());
+        }
+        if (type instanceof AnnotatedArrayType) {
+            return (T) new AnnotatedArrayTypeImpl(type.getType(), type.getAnnotations(),
+                    toCanonical(((AnnotatedArrayType) type).getAnnotatedGenericComponentType(), cache));
+        }
+        return (T) new AnnotatedTypeImpl(type.getType(), type.getAnnotations());
     }
 
     /**
@@ -932,11 +981,15 @@ public class GenericTypeReflector {
         int typeHash = Arrays.stream(types)
                 .mapToInt(t -> t.getType().hashCode())
                 .reduce(0, (x,y) -> 127 * x ^ y);
-        int annotationHash = Arrays.stream(types)
-                .flatMap(t -> Arrays.stream(t.getAnnotations()))
+        int annotationHash = hashCode(Arrays.stream(types)
+                .flatMap(t -> Arrays.stream(t.getAnnotations())));
+        return 31 * typeHash ^ annotationHash;
+    }
+
+    private static int hashCode(Stream<Annotation> annotations) {
+        return annotations
                 .mapToInt(a -> 31 * a.annotationType().hashCode() ^ a.hashCode())
                 .reduce(0, (x,y) -> 127 * x ^ y);
-        return 31 * typeHash ^ annotationHash;
     }
 
     /**
@@ -950,8 +1003,8 @@ public class GenericTypeReflector {
     public static boolean equals(AnnotatedType t1, AnnotatedType t2) {
         Objects.requireNonNull(t1);
         Objects.requireNonNull(t2);
-        t1 = t1 instanceof AnnotatedTypeImpl ? t1 : clone(t1);
-        t2 = t2 instanceof AnnotatedTypeImpl ? t2 : clone(t2);
+        t1 = t1 instanceof AnnotatedTypeImpl ? t1 : toCanonical(t1);
+        t2 = t2 instanceof AnnotatedTypeImpl ? t2 : toCanonical(t2);
 
         return t1.equals(t2);
     }
@@ -986,20 +1039,45 @@ public class GenericTypeReflector {
 
         @Override
         public int hashCode() {
-            return capture.getWildcardType().hashCode() + capture.getTypeVariable().hashCode();
+            return 127 * capture.getWildcardType().hashCode() ^ capture.getTypeVariable().hashCode();
         }
 
         @Override
         public boolean equals(Object obj) {
-            if (!(obj instanceof CaptureCacheKey)) {
-                return false;
-            }
-            CaptureType other = ((CaptureCacheKey) obj).capture;
-            if (!capture.getWildcardType().equals(other.getWildcardType())
-                    || !capture.getTypeVariable().equals(other.getTypeVariable())) {
-                return false;
-            }
-            return Arrays.equals(capture.getUpperBounds(), other.getUpperBounds());
+            if (this == obj) return true;
+            if (!(obj instanceof CaptureCacheKey)) return false;
+
+            CaptureType that = ((CaptureCacheKey) obj).capture;
+            return this.capture == that
+                    || (capture.getWildcardType().equals(that.getWildcardType())
+                    && capture.getTypeVariable().equals(that.getTypeVariable())
+                    && Arrays.equals(capture.getUpperBounds(), that.getUpperBounds()));
+        }
+    }
+
+    private static class AnnotatedCaptureCacheKey {
+        AnnotatedCaptureType capture;
+        CaptureType raw;
+
+        AnnotatedCaptureCacheKey(AnnotatedCaptureType capture) {
+            this.capture = capture;
+            this.raw = (CaptureType) capture.getType();
+        }
+
+        @Override
+        public int hashCode() {
+            return 127 * raw.getWildcardType().hashCode() ^ raw.getTypeVariable().hashCode() ^ GenericTypeReflector.hashCode(Arrays.stream(capture.getAnnotations()));
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) return true;
+            if (!(obj instanceof AnnotatedCaptureCacheKey)) return false;
+
+            AnnotatedCaptureCacheKey that = ((AnnotatedCaptureCacheKey) obj);
+            return this.capture == that.capture ||
+                    (new CaptureCacheKey(raw).equals(new CaptureCacheKey(that.raw))
+                            && Arrays.equals(capture.getAnnotations(), that.capture.getAnnotations()));
         }
     }
 }

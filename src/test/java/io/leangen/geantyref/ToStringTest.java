@@ -71,7 +71,7 @@ public class ToStringTest {
     public void variableTypeTest() {
         TypeVariable var = P.class.getTypeParameters()[0];
         AnnotatedType[] bounds = Arrays.stream(var.getAnnotatedBounds())
-                .map(GenericTypeReflector::clone)
+                .map(GenericTypeReflector::toCanonical)
                 .toArray(AnnotatedType[]::new);
         AnnotatedType type = new AnnotatedTypeVariableImpl(var, var.getAnnotations(), bounds);
         assertEquals("@io.leangen.geantyref.Annotations$A3() " +
@@ -79,7 +79,7 @@ public class ToStringTest {
     }
 
     @Test
-    public void wildcardTypeTest() throws NoSuchMethodException {
+    public void wildcardTypeTest() {
         WildcardType wild = (WildcardType) ((ParameterizedType)(new TypeToken<Class<? extends Number>>(){}.getType()))
                 .getActualTypeArguments()[0];
         AnnotatedType[] upperBounds = new AnnotatedType[] {TypeFactory.parameterizedAnnotatedClass(Number.class, new Annotation[] {a1})};
