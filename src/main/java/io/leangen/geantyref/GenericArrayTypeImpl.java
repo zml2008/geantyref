@@ -8,6 +8,7 @@ package io.leangen.geantyref;
 import java.lang.reflect.Array;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Type;
+import java.util.Objects;
 
 class GenericArrayTypeImpl implements GenericArrayType {
     private Type componentType;
@@ -35,13 +36,14 @@ class GenericArrayTypeImpl implements GenericArrayType {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        return obj instanceof GenericArrayType && componentType.equals(((GenericArrayType) obj).getGenericComponentType());
+    public boolean equals(Object other) {
+        return other instanceof GenericArrayType
+                && Objects.equals(this.componentType, ((GenericArrayType) other).getGenericComponentType());
     }
 
     @Override
     public int hashCode() {
-        return 127 * componentType.hashCode();
+        return Objects.hashCode(this.componentType);
     }
 
     @Override

@@ -8,6 +8,7 @@ package io.leangen.geantyref;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
+import java.util.Objects;
 
 class ParameterizedTypeImpl implements ParameterizedType {
     private final Class<?> rawType;
@@ -33,19 +34,19 @@ class ParameterizedTypeImpl implements ParameterizedType {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (!(obj instanceof ParameterizedType))
-            return false;
+    public boolean equals(Object other) {
+        if (!(other instanceof ParameterizedType)) return false;
 
-        ParameterizedType other = (ParameterizedType) obj;
-        return rawType.equals(other.getRawType())
-                && Arrays.equals(actualTypeArguments, other.getActualTypeArguments())
-                && (ownerType == null ? other.getOwnerType() == null : ownerType.equals(other.getOwnerType()));
+        ParameterizedType that = (ParameterizedType) other;
+        return this == that ||
+                Objects.equals(this.ownerType, that.getOwnerType())
+                        && Objects.equals(this.rawType, that.getRawType())
+                        && Arrays.equals(this.actualTypeArguments, that.getActualTypeArguments());
     }
 
     @Override
     public int hashCode() {
-        return  127 * (rawType.hashCode() + (ownerType != null ? ownerType.hashCode() : 0)) ^ Arrays.hashCode(actualTypeArguments);
+        return Arrays.hashCode(this.actualTypeArguments) ^ Objects.hashCode(this.ownerType) ^ Objects.hashCode(this.rawType);
     }
 
     @Override

@@ -29,17 +29,17 @@ class WildcardTypeImpl implements WildcardType {
     }
 
     @Override
-    public boolean equals(Object obj) {
-        if (!(obj instanceof WildcardType))
+    public boolean equals(Object other) {
+        if (!(other instanceof WildcardType)) {
             return false;
-        WildcardType other = (WildcardType) obj;
-        return Arrays.equals(lowerBounds, other.getLowerBounds())
-                && Arrays.equals(upperBounds, other.getUpperBounds());
+        }
+        WildcardType that = (WildcardType) other;
+        return Arrays.equals(this.getLowerBounds(), that.getLowerBounds()) && Arrays.equals(this.getUpperBounds(), that.getUpperBounds());
     }
 
     @Override
     public int hashCode() {
-        return 127 * Arrays.hashCode(lowerBounds) ^ Arrays.hashCode(upperBounds);
+        return Arrays.hashCode(this.getLowerBounds()) ^ Arrays.hashCode(this.getUpperBounds());
     }
 
     @Override

@@ -86,22 +86,21 @@ public class TypeVariableImpl<D extends GenericDeclaration> implements TypeVaria
     }
 
     @Override
-    public int hashCode() {
-        return 127 * (this.getName().hashCode() + Arrays.hashCode(this.getBounds()))
-                ^ (this.getGenericDeclaration().hashCode() + Arrays.hashCode(this.getAnnotations()));
-    }
-
-    @Override
     public boolean equals(Object other) {
         if (this == other) {
             return true;
         }
-        if (!(other instanceof TypeVariableImpl)) {
+        if (other instanceof TypeVariable) {
+            TypeVariable that = (TypeVariable) other;
+            return Objects.equals(this.genericDeclaration, that.getGenericDeclaration()) && Objects.equals(this.name, that.getName());
+        } else {
             return false;
         }
-        TypeVariableImpl that = (TypeVariableImpl) other;
-        return this.getName().equals(that.getName()) && Arrays.equals(this.getAnnotations(), that.getAnnotations())
-                && Arrays.equals(this.getBounds(), that.getBounds()) && this.getGenericDeclaration().equals(that.getGenericDeclaration());
+    }
+
+    @Override
+    public int hashCode() {
+        return this.genericDeclaration.hashCode() ^ this.name.hashCode();
     }
 
     @Override
