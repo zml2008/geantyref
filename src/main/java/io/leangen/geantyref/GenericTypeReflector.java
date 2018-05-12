@@ -16,6 +16,7 @@ import java.lang.reflect.Executable;
 import java.lang.reflect.Field;
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
@@ -140,8 +141,12 @@ public class GenericTypeReflector {
      */
     public static boolean isMissingTypeParameters(Type type) {
         if (type instanceof Class) {
-            for (Class<?> clazz = (Class<?>) type; clazz != null; clazz = clazz.getEnclosingClass()) {
-                if (clazz.getTypeParameters().length != 0)
+            Class<?> clazz = (Class<?>) type;
+            if (Modifier.isStatic(clazz.getModifiers())) {
+                return clazz.getTypeParameters().length != 0;
+            }
+            for (Class<?> enclosing = clazz; enclosing != null; enclosing = enclosing.getEnclosingClass()) {
+                if (enclosing.getTypeParameters().length != 0)
                     return true;
             }
             return false;
