@@ -28,6 +28,8 @@ import static io.leangen.geantyref.GenericTypeReflector.toCanonical;
  * The guarantees of {@code AnnotatedTypeMap} are then the same as of the map it is backed by.
  *
  * @param <V> the type of mapped values
+ *
+ * @see AnnotatedTypeSet
  */
 public class AnnotatedTypeMap<K extends AnnotatedType, V> implements Map<K, V> {
 
@@ -45,6 +47,7 @@ public class AnnotatedTypeMap<K extends AnnotatedType, V> implements Map<K, V> {
      *
      * @param inner A non-null map instance that will back the constructed {@code AnnotatedTypeMap}
      */
+    @SuppressWarnings("WeakerAccess")
     public AnnotatedTypeMap(Map<K, V> inner) {
         Objects.requireNonNull(inner);
         if (!inner.isEmpty()) {
