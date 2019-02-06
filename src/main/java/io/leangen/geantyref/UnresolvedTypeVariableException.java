@@ -14,7 +14,7 @@ class UnresolvedTypeVariableException extends RuntimeException {
     UnresolvedTypeVariableException(TypeVariable<?> tv) {
         super("An exact type is requested, but the type contains a type variable that cannot be resolved.\n" +
                 "   Variable: " + tv.getName() + " from " + tv.getGenericDeclaration() + "\n" +
-                "   Hint: This is usually caused by trying to get an exact type when a generic method who's type parameters are not given is involved.");
+                "   Hint: This is usually caused by trying to get an exact type when a generic method with no given type parameters is involved.");
         this.tv = tv;
     }
 

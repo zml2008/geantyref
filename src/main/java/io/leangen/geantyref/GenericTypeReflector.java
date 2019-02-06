@@ -891,6 +891,45 @@ public class GenericTypeReflector {
         return replaceAnnotations(original, merge(original.getAnnotations(), annotations));
     }
 
+    @SuppressWarnings("unchecked")
+    public static <T extends AnnotatedType> T mergeAnnotations(T t1, T t2) {
+        Annotation[] merged = merge(t1.getAnnotations(), t2.getAnnotations());
+        if (t1 instanceof AnnotatedParameterizedType) {
+            AnnotatedType[] p1 = ((AnnotatedParameterizedType) t1).getAnnotatedActualTypeArguments();
+            AnnotatedType[] p2 = ((AnnotatedParameterizedType) t2).getAnnotatedActualTypeArguments();
+            AnnotatedType[] params = new AnnotatedType[p1.length];
+            for (int i = 0; i < p1.length; i++) {
+                params[i] = mergeAnnotations(p1[i], p2[i]);
+            }
+            return (T) new AnnotatedParameterizedTypeImpl((ParameterizedType) t1.getType(), merged, params);
+        }
+        if (t1 instanceof AnnotatedWildcardType) {
+            AnnotatedType[] l1 = ((AnnotatedWildcardType) t1).getAnnotatedLowerBounds();
+            AnnotatedType[] l2 = ((AnnotatedWildcardType) t2).getAnnotatedLowerBounds();
+            AnnotatedType[] lowerBounds = new AnnotatedType[l1.length];
+            for (int i = 0; i < l1.length; i++) {
+                lowerBounds[i] = mergeAnnotations(l1[i], l2[i]);
+            }
+            AnnotatedType[] u1 = ((AnnotatedWildcardType) t1).getAnnotatedUpperBounds();
+            AnnotatedType[] u2 = ((AnnotatedWildcardType) t2).getAnnotatedUpperBounds();
+            AnnotatedType[] upperBounds = new AnnotatedType[u1.length];
+            for (int i = 0; i < u1.length; i++) {
+                upperBounds[i] = mergeAnnotations(u1[i], u2[i]);
+            }
+            return (T) new AnnotatedWildcardTypeImpl((WildcardType) t1.getType(), merged, lowerBounds, upperBounds);
+        }
+        if (t1 instanceof AnnotatedTypeVariable) {
+            return (T) new AnnotatedTypeVariableImpl((TypeVariable<?>) t1.getType(), merged);
+        }
+        if (t1 instanceof AnnotatedArrayType) {
+            AnnotatedType componentType = mergeAnnotations(
+                    ((AnnotatedArrayType) t1).getAnnotatedGenericComponentType(),
+                    ((AnnotatedArrayType) t2).getAnnotatedGenericComponentType());
+            return (T) new AnnotatedArrayTypeImpl(t1.getType(), merged, componentType);
+        }
+        return (T) new AnnotatedTypeImpl(t1.getType(), merged);
+    }
+
     /**
      * Creates a new {@link AnnotatedParameterizedType} of the same raw class as the provided {@code type}
      * by with all of its type parameters replaced by {@code typeParameters}.

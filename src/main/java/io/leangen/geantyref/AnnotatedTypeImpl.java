@@ -9,7 +9,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Type;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -25,7 +25,7 @@ class AnnotatedTypeImpl implements AnnotatedType {
 
     AnnotatedTypeImpl(Type type, Annotation[] annotations) {
         this.type = Objects.requireNonNull(type);
-        this.annotations = new HashMap<>();
+        this.annotations = new LinkedHashMap<>();
         for (Annotation annotation : annotations) {
             this.annotations.put(annotation.annotationType(), annotation);
         }
@@ -44,7 +44,7 @@ class AnnotatedTypeImpl implements AnnotatedType {
 
     @Override
     public Annotation[] getAnnotations() {
-        return annotations.values().toArray(new Annotation[annotations.size()]);
+        return annotations.values().toArray(new Annotation[0]);
     }
 
     //should this maybe return only annotations directly on type?

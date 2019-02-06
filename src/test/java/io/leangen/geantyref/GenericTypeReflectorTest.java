@@ -5,7 +5,16 @@
 
 package io.leangen.geantyref;
 
+import static io.leangen.geantyref.Annotations.A1;
+import static io.leangen.geantyref.Annotations.A2;
+import static io.leangen.geantyref.Annotations.A3;
+import static io.leangen.geantyref.Annotations.A4;
+import static io.leangen.geantyref.Annotations.A5;
+import static io.leangen.geantyref.GenericTypeReflector.getExactSubType;
+import static org.junit.Assert.assertArrayEquals;
+
 import java.awt.*;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedArrayType;
 import java.lang.reflect.AnnotatedParameterizedType;
 import java.lang.reflect.AnnotatedType;
@@ -18,9 +27,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-
-import static io.leangen.geantyref.GenericTypeReflector.getExactSubType;
 
 /**
  * Test for reflection done in GenericTypeReflector.
@@ -153,6 +162,22 @@ public class GenericTypeReflectorTest extends AbstractGenericsReflectorTest {
         assertEquals(Number.class, ((TypeVariable) parameterTypes[0]).getBounds()[0]);
     }
 
+    public void testAnnotationMerging() {
+        AnnotatedParameterizedType merged = GenericTypeReflector.mergeAnnotations((AnnotatedParameterizedType)t1, (AnnotatedParameterizedType)t2);
+        assertAnnotationsPresent(merged, A1.class, A5.class);
+        AnnotatedParameterizedType map = (AnnotatedParameterizedType) merged.getAnnotatedActualTypeArguments()[0];
+        assertAnnotationsPresent(map, A2.class, A4.class);
+        assertAnnotationsPresent(map.getAnnotatedActualTypeArguments()[0], A3.class, A2.class);
+        AnnotatedArrayType intArray = (AnnotatedArrayType) map.getAnnotatedActualTypeArguments()[1];
+        assertAnnotationsPresent(intArray, A5.class, A1.class);
+        assertAnnotationsPresent(intArray.getAnnotatedGenericComponentType(), A4.class, A3.class);
+    }
+
+    @SafeVarargs
+    private static void assertAnnotationsPresent(AnnotatedType type, Class<? extends Annotation>... annotations) {
+        assertArrayEquals(annotations, Arrays.stream(type.getAnnotations()).map(Annotation::annotationType).toArray());
+    }
+
     private class N {}
     private class P<S, K> extends N {}
     private class M<U, R> extends P<U, R> {}
@@ -160,6 +185,7 @@ public class GenericTypeReflectorTest extends AbstractGenericsReflectorTest {
     private class C1<X, Y, Z> extends M<Y, X> {}
     private static class D<T> { D(T t) {}}
     private interface I<T> {<S extends T> S m(S s);}
-    private static class Q<G> implements I<G> { @Override public <S extends G> S m(S s) { return null; }
-    }
+    private static class Q<G> implements I<G> { @Override public <S extends G> S m(S s) { return null; }}
+    private static AnnotatedType t1 = new TypeToken<@A1 Optional<@A2 Map<@A3 String, @A4 Integer @A5 []>>>(){}.getAnnotatedType();
+    private static AnnotatedType t2 = new TypeToken<@A5 Optional<@A4 Map<@A2 String, @A3 Integer @A1 []>>>(){}.getAnnotatedType();
 }
