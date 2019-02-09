@@ -5,6 +5,8 @@
 
 package io.leangen.geantyref;
 
+import static java.util.Arrays.stream;
+
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedArrayType;
@@ -32,8 +34,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
-
-import static java.util.Arrays.stream;
 
 /**
  * Utility class for doing reflection on types.
@@ -113,7 +113,7 @@ public class GenericTypeReflector {
      * @param typeAndParams must be either ParameterizedType, or (in case there are no type arguments, or it's a raw type) Class
      * @return toMapType, but with type parameters from typeAndParams replaced.
      */
-    public static AnnotatedType mapTypeParameters(AnnotatedType toMapType, AnnotatedType typeAndParams) {
+    private static AnnotatedType mapTypeParameters(AnnotatedType toMapType, AnnotatedType typeAndParams) {
         return mapTypeParameters(toMapType, typeAndParams, VarMap.MappingMode.EXACT);
     }
 
@@ -133,6 +133,63 @@ public class GenericTypeReflector {
             }
             return varMap.map(toMapType, mappingMode);
         }
+    }
+
+    public static AnnotatedType resolveExactType(AnnotatedType unresolved, AnnotatedType typeAndParams) {
+        return resolveType(unresolved, expandGenerics(typeAndParams), VarMap.MappingMode.EXACT);
+    }
+
+    public static Type resolveExactType(Type unresolved, Type typeAndParams) {
+        return resolveType(annotate(unresolved), expandGenerics(annotate(typeAndParams)), VarMap.MappingMode.EXACT).getType();
+    }
+
+    public static AnnotatedType resolveType(AnnotatedType unresolved, AnnotatedType typeAndParams) {
+        return resolveType(unresolved, expandGenerics(typeAndParams), VarMap.MappingMode.ALLOW_INCOMPLETE);
+    }
+
+    public static Type resolveType(Type unresolved, Type typeAndParams) {
+        return resolveType(annotate(unresolved), expandGenerics(annotate(typeAndParams)), VarMap.MappingMode.ALLOW_INCOMPLETE).getType();
+    }
+
+    private static AnnotatedType resolveType(AnnotatedType unresolved, AnnotatedType typeAndParams, VarMap.MappingMode mappingMode) {
+        if (unresolved instanceof AnnotatedParameterizedType) {
+            AnnotatedParameterizedType parameterizedType = (AnnotatedParameterizedType) unresolved;
+            AnnotatedType[] params = stream(parameterizedType.getAnnotatedActualTypeArguments())
+                    .map(p -> resolveType(p, typeAndParams, mappingMode))
+                    .toArray(AnnotatedType[]::new);
+            return replaceParameters(parameterizedType, params);
+        }
+        if (unresolved instanceof AnnotatedWildcardType) {
+            AnnotatedType[] lower = stream(((AnnotatedWildcardType) unresolved).getAnnotatedLowerBounds())
+                    .map(b -> resolveType(b, typeAndParams, mappingMode))
+                    .toArray(AnnotatedType[]::new);
+            AnnotatedType[] upper = stream(((AnnotatedWildcardType) unresolved).getAnnotatedUpperBounds())
+                    .map(b -> resolveType(b, typeAndParams, mappingMode))
+                    .toArray(AnnotatedType[]::new);
+            return new AnnotatedWildcardTypeImpl((WildcardType) unresolved.getType(), unresolved.getAnnotations(), lower, upper);
+        }
+        if (unresolved instanceof AnnotatedTypeVariable) {
+            TypeVariable var = (TypeVariable) unresolved.getType();
+            if (var.getGenericDeclaration() instanceof Class) {
+                //noinspection unchecked
+                AnnotatedType resolved = getTypeParameter(typeAndParams, var);
+                if (resolved != null) {
+                    return updateAnnotations(resolved, unresolved.getAnnotations());
+                }
+            }
+            if (mappingMode.equals(VarMap.MappingMode.ALLOW_INCOMPLETE)) {
+                return unresolved;
+            }
+            throw new IllegalArgumentException("Variable " + var.getName() + " is not declared by the given type "
+                    + typeAndParams.getType().getTypeName() + " or its super types");
+        }
+        if (unresolved instanceof AnnotatedArrayType) {
+            AnnotatedType componentType = resolveType(
+                    ((AnnotatedArrayType) unresolved).getAnnotatedGenericComponentType(), typeAndParams, mappingMode);
+            return new AnnotatedArrayTypeImpl(TypeFactory.arrayOf(componentType.getType()), unresolved.getAnnotations(), componentType);
+        }
+        //TODO Deal with CaptureType somehow...
+        return unresolved;
     }
 
     /**
@@ -1030,6 +1087,44 @@ public class GenericTypeReflector {
                     toCanonical(((AnnotatedArrayType) type).getAnnotatedGenericComponentType(), leafTransformer, cache));
         }
         return (T) new AnnotatedTypeImpl(leafTransformer.apply(type.getType()), type.getAnnotations());
+    }
+
+    private static AnnotatedType expandGenerics(AnnotatedType type) {
+        if (type instanceof AnnotatedParameterizedType) {
+            AnnotatedType[] params = Arrays.stream(((AnnotatedParameterizedType) type).getAnnotatedActualTypeArguments())
+                    .map(param -> expandGenerics(type))
+                    .toArray(AnnotatedType[]::new);
+            return new AnnotatedParameterizedTypeImpl((ParameterizedType) type.getType(), type.getAnnotations(), params);
+        }
+        if (type instanceof AnnotatedWildcardType) {
+            AnnotatedWildcardType wildcardType = (AnnotatedWildcardType) type;
+            AnnotatedType[] lowerBounds = Arrays.stream(wildcardType.getAnnotatedLowerBounds())
+                    .map(GenericTypeReflector::expandGenerics)
+                    .toArray(AnnotatedType[]::new);
+            AnnotatedType[] upperBounds = Arrays.stream(wildcardType.getAnnotatedUpperBounds())
+                    .map(GenericTypeReflector::expandGenerics)
+                    .toArray(AnnotatedType[]::new);
+            return new AnnotatedWildcardTypeImpl((WildcardType) wildcardType.getType(), wildcardType.getAnnotations(),
+                    lowerBounds, upperBounds);
+        }
+        if (type instanceof AnnotatedTypeVariable) {
+            AnnotatedType[] bounds = Arrays.stream(((AnnotatedTypeVariable) type).getAnnotatedBounds())
+                    .map(GenericTypeReflector::expandGenerics)
+                    .toArray(AnnotatedType[]::new);
+            return new AnnotatedTypeVariableImpl((TypeVariable<?>) type.getType(), type.getAnnotations(), bounds);
+        }
+        if (type instanceof AnnotatedArrayType) {
+            return new AnnotatedArrayTypeImpl(type.getType(), type.getAnnotations(), expandGenerics(((AnnotatedArrayType) type).getAnnotatedGenericComponentType()));
+        }
+        if (type.getType() instanceof Class) {
+            Class<?> clazz = (Class<?>) type.getType();
+            if (clazz.getTypeParameters().length > 0) {
+                ParameterizedType inner = new ParameterizedTypeImpl(clazz, clazz.getTypeParameters(), clazz.getDeclaringClass());
+                AnnotatedType[] params = stream(clazz.getTypeParameters()).map(GenericTypeReflector::annotate).toArray(AnnotatedType[]::new);
+                return new AnnotatedParameterizedTypeImpl(inner, clazz.getAnnotations(), params);
+            }
+        }
+        return type;
     }
 
     /**

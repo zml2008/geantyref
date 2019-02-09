@@ -10,7 +10,10 @@ import static io.leangen.geantyref.Annotations.A2;
 import static io.leangen.geantyref.Annotations.A3;
 import static io.leangen.geantyref.Annotations.A4;
 import static io.leangen.geantyref.Annotations.A5;
+import static io.leangen.geantyref.GenericTypeReflector.annotate;
 import static io.leangen.geantyref.GenericTypeReflector.getExactSubType;
+import static io.leangen.geantyref.GenericTypeReflector.resolveExactType;
+import static io.leangen.geantyref.GenericTypeReflector.resolveType;
 import static org.junit.Assert.assertArrayEquals;
 
 import java.awt.*;
@@ -173,6 +176,25 @@ public class GenericTypeReflectorTest extends AbstractGenericsReflectorTest {
         assertAnnotationsPresent(intArray.getAnnotatedGenericComponentType(), A4.class, A3.class);
     }
 
+    public void testExactTypeResolution() throws NoSuchMethodException {
+        Method m = W.class.getMethod("resolvable");
+        AnnotatedType resolved = resolveExactType(m.getAnnotatedReturnType(), annotate(W.class));
+        assertEquals(new TypeToken<Set<String[]>>() {}.getType(), resolved.getType());
+        assertAnnotationsPresent(((AnnotatedArrayType)((AnnotatedParameterizedType) resolved)
+                .getAnnotatedActualTypeArguments()[0]).getAnnotatedGenericComponentType(), A1.class, A2.class);
+    }
+
+    public void testPartialTypeResolution() throws NoSuchMethodException {
+        Method m = W.class.getMethod("partiallyResolvable");
+        AnnotatedType resolved = resolveType(m.getAnnotatedReturnType(), annotate(W.class));
+        AnnotatedType key = ((AnnotatedParameterizedType) resolved).getAnnotatedActualTypeArguments()[0];
+        AnnotatedType value = ((AnnotatedParameterizedType) resolved).getAnnotatedActualTypeArguments()[1];
+        assertEquals(String.class, key.getType());
+        assertAnnotationsPresent(key, A1.class, A2.class);
+        assertEquals(W.class.getTypeParameters()[0], value.getType());
+        assertAnnotationsPresent(value, A1.class, A3.class);
+    }
+
     @SafeVarargs
     private static void assertAnnotationsPresent(AnnotatedType type, Class<? extends Annotation>... annotations) {
         assertArrayEquals(annotations, Arrays.stream(type.getAnnotations()).map(Annotation::annotationType).toArray());
@@ -186,6 +208,13 @@ public class GenericTypeReflectorTest extends AbstractGenericsReflectorTest {
     private static class D<T> { D(T t) {}}
     private interface I<T> {<S extends T> S m(S s);}
     private static class Q<G> implements I<G> { @Override public <S extends G> S m(S s) { return null; }}
+
+    private interface O<@A1 T, @A1 S> {
+        default Set<@A2 T[]> resolvable() { return null; }
+        default Map<@A2 T, @A3 S> partiallyResolvable() { return null; }
+    }
+    private static class W<T> implements O<String, T> {}
+
     private static AnnotatedType t1 = new TypeToken<@A1 Optional<@A2 Map<@A3 String, @A4 Integer @A5 []>>>(){}.getAnnotatedType();
     private static AnnotatedType t2 = new TypeToken<@A5 Optional<@A4 Map<@A2 String, @A3 Integer @A1 []>>>(){}.getAnnotatedType();
 }
