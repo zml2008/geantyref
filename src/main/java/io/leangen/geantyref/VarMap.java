@@ -95,7 +95,7 @@ class VarMap {
             if (!map.containsKey(tv)) {
                 if (mappingMode.equals(MappingMode.ALLOW_INCOMPLETE)) {
                     AnnotatedTypeVariable variable = (AnnotatedTypeVariable) type;
-                    AnnotatedType[] bounds = map(variable.getAnnotatedBounds());
+                    AnnotatedType[] bounds = map(variable.getAnnotatedBounds(), mappingMode);
                     Annotation[] merged = merge(variable.getAnnotations(), tv.getAnnotations());
                     TypeVariableImpl v = new TypeVariableImpl<>(tv, merged, bounds);
                     return new AnnotatedTypeVariableImpl(v, merged, bounds);
@@ -112,16 +112,17 @@ class VarMap {
             Class raw = (Class) inner.getRawType();
             AnnotatedType[] typeParameters = new AnnotatedType[raw.getTypeParameters().length];
             for (int i = 0; i < typeParameters.length; i++) {
-                AnnotatedType typeParameter = map(pType.getAnnotatedActualTypeArguments()[i]);
+                AnnotatedType typeParameter = map(pType.getAnnotatedActualTypeArguments()[i], mappingMode);
                 typeParameters[i] = updateAnnotations(typeParameter, raw.getTypeParameters()[i].getAnnotations());
             }
             Type[] rawArgs = stream(typeParameters).map(AnnotatedType::getType).toArray(Type[]::new);
-            ParameterizedType newInner = new ParameterizedTypeImpl((Class) inner.getRawType(), rawArgs, inner.getOwnerType() == null ? null : map(annotate(inner.getOwnerType())).getType());
+	        Type innerOwnerType = inner.getOwnerType() == null ? null : map(annotate(inner.getOwnerType()), mappingMode).getType();
+	        ParameterizedType newInner = new ParameterizedTypeImpl((Class) inner.getRawType(), rawArgs, innerOwnerType);
             return new AnnotatedParameterizedTypeImpl(newInner, merge(pType.getAnnotations(), raw.getAnnotations()), typeParameters);
         } else if (type instanceof AnnotatedWildcardType) {
             AnnotatedWildcardType wType = (AnnotatedWildcardType) type;
-            AnnotatedType[] up = map(wType.getAnnotatedUpperBounds());
-            AnnotatedType[] lw = map(wType.getAnnotatedLowerBounds());
+            AnnotatedType[] up = map(wType.getAnnotatedUpperBounds(), mappingMode);
+            AnnotatedType[] lw = map(wType.getAnnotatedLowerBounds(), mappingMode);
             Type[] upperBounds;
             if (up == null || up.length == 0) {
                 upperBounds = ((WildcardType) wType.getType()).getUpperBounds();
@@ -131,16 +132,20 @@ class VarMap {
             WildcardType w = new WildcardTypeImpl(upperBounds, stream(lw).map(AnnotatedType::getType).toArray(Type[]::new));
             return new AnnotatedWildcardTypeImpl(w, wType.getAnnotations(), lw, up);
         } else if (type instanceof AnnotatedArrayType) {
-            return AnnotatedArrayTypeImpl.createArrayType(map(((AnnotatedArrayType) type).getAnnotatedGenericComponentType()), type.getAnnotations());
+            return AnnotatedArrayTypeImpl.createArrayType(map(((AnnotatedArrayType) type).getAnnotatedGenericComponentType(), mappingMode), type.getAnnotations());
         } else {
             throw new RuntimeException("Not implemented: mapping " + type.getClass() + " (" + type + ")");
         }
     }
 
     AnnotatedType[] map(AnnotatedType[] types) {
+    	return map(types, MappingMode.EXACT);
+    }
+
+    AnnotatedType[] map(AnnotatedType[] types, MappingMode mappingMode) {
         AnnotatedType[] result = new AnnotatedType[types.length];
         for (int i = 0; i < types.length; i++) {
-            result[i] = map(types[i]);
+            result[i] = map(types[i], mappingMode);
         }
         return result;
     }
