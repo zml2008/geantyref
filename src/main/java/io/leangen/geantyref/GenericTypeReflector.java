@@ -881,7 +881,7 @@ public class GenericTypeReflector {
         }
         if (type instanceof GenericArrayType) {
             GenericArrayType genArray = (GenericArrayType) type;
-            return new AnnotatedArrayTypeImpl(genArray, new Annotation[0], annotate(genArray.getGenericComponentType()));
+            return new AnnotatedArrayTypeImpl(genArray, new Annotation[0], annotate(genArray.getGenericComponentType(), cache));
         }
         if (type instanceof Class) {
             Class clazz = (Class) type;
