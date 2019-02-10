@@ -140,7 +140,7 @@ public class GenericTypeReflector {
     }
 
     public static Type resolveExactType(Type unresolved, Type typeAndParams) {
-        return resolveType(annotate(unresolved), expandGenerics(annotate(typeAndParams)), VarMap.MappingMode.EXACT).getType();
+        return resolveType(annotate(unresolved), annotate(typeAndParams, true), VarMap.MappingMode.EXACT).getType();
     }
 
     public static AnnotatedType resolveType(AnnotatedType unresolved, AnnotatedType typeAndParams) {
@@ -148,7 +148,7 @@ public class GenericTypeReflector {
     }
 
     public static Type resolveType(Type unresolved, Type typeAndParams) {
-        return resolveType(annotate(unresolved), expandGenerics(annotate(typeAndParams)), VarMap.MappingMode.ALLOW_INCOMPLETE).getType();
+        return resolveType(annotate(unresolved), annotate(typeAndParams, true), VarMap.MappingMode.ALLOW_INCOMPLETE).getType();
     }
 
     private static AnnotatedType resolveType(AnnotatedType unresolved, AnnotatedType typeAndParams, VarMap.MappingMode mappingMode) {
@@ -795,6 +795,10 @@ public class GenericTypeReflector {
         return new ArrayList<>(result);
     }
 
+    private static AnnotatedType annotate(Type type, boolean expandGenerics) {
+        return annotate(type, expandGenerics, new HashMap<>());
+    }
+
     /**
      * Recursively wraps a {@link Type} into an {@link AnnotatedType} using the annotations found on
      * the erasure classes.
@@ -803,7 +807,7 @@ public class GenericTypeReflector {
      * @return Type whose structure has been recursively annotated
      */
     public static AnnotatedType annotate(Type type) {
-        return annotate(type, new HashMap<>());
+        return annotate(type, false);
     }
 
     /**
@@ -838,12 +842,12 @@ public class GenericTypeReflector {
      * <p>See {@link CaptureCacheKey}</p>
      * <p>See {@link CaptureType}</p>
      */
-    private static AnnotatedType annotate(Type type, Map<CaptureCacheKey, AnnotatedType> cache) {
+    private static AnnotatedType annotate(Type type, boolean expandGenerics, Map<CaptureCacheKey, AnnotatedType> cache) {
         if (type instanceof ParameterizedType) {
             ParameterizedType parameterized = (ParameterizedType) type;
             AnnotatedType[] params = new AnnotatedType[parameterized.getActualTypeArguments().length];
             for (int i = 0; i < params.length; i++) {
-                AnnotatedType param = annotate(parameterized.getActualTypeArguments()[i], cache);
+                AnnotatedType param = annotate(parameterized.getActualTypeArguments()[i], expandGenerics, cache);
                 params[i] = updateAnnotations(param, erase(type).getTypeParameters()[i].getAnnotations());
             }
             return new AnnotatedParameterizedTypeImpl(parameterized, erase(type).getAnnotations(), params);
@@ -855,13 +859,13 @@ public class GenericTypeReflector {
             }
             CaptureType capture = ((CaptureType) type);
             AnnotatedCaptureType annotatedCapture = new AnnotatedCaptureTypeImpl(
-                    ((AnnotatedWildcardType) annotate(capture.getWildcardType(), cache)),
-                    (AnnotatedTypeVariable) annotate(capture.getTypeVariable(), cache),
+                    ((AnnotatedWildcardType) annotate(capture.getWildcardType(), expandGenerics, cache)),
+                    (AnnotatedTypeVariable) annotate(capture.getTypeVariable(), expandGenerics, cache),
                     null);
 
             cache.put(new CaptureCacheKey(capture), annotatedCapture);
             AnnotatedType[] upperBounds = stream(capture.getUpperBounds())
-                    .map(bound -> annotate(bound, cache))
+                    .map(bound -> annotate(bound, expandGenerics, cache))
                     .toArray(AnnotatedType[]::new);
             annotatedCapture.setAnnotatedUpperBounds(upperBounds); //complete the type
             return annotatedCapture;
@@ -869,10 +873,10 @@ public class GenericTypeReflector {
         if (type instanceof WildcardType) {
             WildcardType wildcard = (WildcardType) type;
             AnnotatedType[] lowerBounds = stream(wildcard.getLowerBounds())
-                    .map(bound -> annotate(bound, cache))
+                    .map(bound -> annotate(bound, expandGenerics, cache))
                     .toArray(AnnotatedType[]::new);
             AnnotatedType[] upperBounds = stream(wildcard.getUpperBounds())
-                    .map(bound -> annotate(bound, cache))
+                    .map(bound -> annotate(bound, expandGenerics, cache))
                     .toArray(AnnotatedType[]::new);
             return new AnnotatedWildcardTypeImpl(wildcard, erase(type).getAnnotations(), lowerBounds, upperBounds);
         }
@@ -881,7 +885,7 @@ public class GenericTypeReflector {
         }
         if (type instanceof GenericArrayType) {
             GenericArrayType genArray = (GenericArrayType) type;
-            return new AnnotatedArrayTypeImpl(genArray, new Annotation[0], annotate(genArray.getGenericComponentType(), cache));
+            return new AnnotatedArrayTypeImpl(genArray, new Annotation[0], annotate(genArray.getGenericComponentType(), expandGenerics, cache));
         }
         if (type instanceof Class) {
             Class clazz = (Class) type;
@@ -889,6 +893,9 @@ public class GenericTypeReflector {
                 Class componentClass = clazz.getComponentType();
                 return AnnotatedArrayTypeImpl.createArrayType(
                         new AnnotatedTypeImpl(componentClass, componentClass.getAnnotations()), new Annotation[0]);
+            }
+            if (clazz.getTypeParameters().length > 0 && expandGenerics) {
+                return expandClassGenerics(clazz);
             }
             return new AnnotatedTypeImpl(clazz, clazz.getAnnotations());
         }
@@ -1119,12 +1126,16 @@ public class GenericTypeReflector {
         if (type.getType() instanceof Class) {
             Class<?> clazz = (Class<?>) type.getType();
             if (clazz.getTypeParameters().length > 0) {
-                ParameterizedType inner = new ParameterizedTypeImpl(clazz, clazz.getTypeParameters(), clazz.getDeclaringClass());
-                AnnotatedType[] params = stream(clazz.getTypeParameters()).map(GenericTypeReflector::annotate).toArray(AnnotatedType[]::new);
-                return new AnnotatedParameterizedTypeImpl(inner, clazz.getAnnotations(), params);
+                return expandClassGenerics(clazz);
             }
         }
         return type;
+    }
+
+    private static AnnotatedParameterizedType expandClassGenerics(Class<?> type) {
+        ParameterizedType inner = new ParameterizedTypeImpl(type, type.getTypeParameters(), type.getDeclaringClass());
+        AnnotatedType[] params = stream(type.getTypeParameters()).map(GenericTypeReflector::annotate).toArray(AnnotatedType[]::new);
+        return new AnnotatedParameterizedTypeImpl(inner, type.getAnnotations(), params);
     }
 
     /**
@@ -1205,7 +1216,7 @@ public class GenericTypeReflector {
      * while recursively inspecting their structure. Necessary because {@link CaptureType} can have
      * infinitely recursive structure.
      *
-     * <p>See {@link #annotate(Type, Map)}</p>
+     * <p>See {@link #annotate(Type, boolean, Map)}</p>
      */
     private static class CaptureCacheKey {
         CaptureType capture;
