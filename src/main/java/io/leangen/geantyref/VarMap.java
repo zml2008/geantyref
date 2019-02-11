@@ -98,7 +98,7 @@ class VarMap {
                     AnnotatedType[] bounds = map(variable.getAnnotatedBounds(), mappingMode);
                     Annotation[] merged = merge(variable.getAnnotations(), tv.getAnnotations());
                     TypeVariableImpl v = new TypeVariableImpl<>(tv, merged, bounds);
-                    return new AnnotatedTypeVariableImpl(v, merged, bounds);
+                    return new AnnotatedTypeVariableImpl(v, merged);
                 } else {
                     throw new UnresolvedTypeVariableException(tv);
                 }

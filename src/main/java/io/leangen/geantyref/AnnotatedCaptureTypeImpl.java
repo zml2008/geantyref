@@ -5,6 +5,8 @@
 
 package io.leangen.geantyref;
 
+import static java.util.Arrays.stream;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.AnnotatedTypeVariable;
@@ -19,38 +21,30 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static io.leangen.geantyref.GenericTypeReflector.typeArraysEqual;
-import static java.util.Arrays.stream;
-
-class AnnotatedCaptureTypeImpl implements AnnotatedCaptureType {
+class AnnotatedCaptureTypeImpl extends AnnotatedTypeImpl implements AnnotatedCaptureType {
 
     private final AnnotatedWildcardType wildcard;
     private final AnnotatedTypeVariable variable;
     private final AnnotatedType[] lowerBounds;
     private AnnotatedType[] upperBounds;
-    private CaptureType type;
-    private Map<Class<? extends Annotation>, Annotation> annotations;
-    private Annotation[] declaredAnnotations;
+    private final CaptureType type;
+    private final Annotation[] declaredAnnotations;
 
-    public AnnotatedCaptureTypeImpl(AnnotatedWildcardType wildcard, AnnotatedTypeVariable variable, AnnotatedType[] upperBounds, Annotation[] annotations) {
-        this(wildcard, variable, upperBounds);
-        this.annotations = Arrays.stream(annotations).collect(Collectors.toMap(Annotation::getClass, annotation -> annotation));
+    AnnotatedCaptureTypeImpl(AnnotatedWildcardType wildcard, AnnotatedTypeVariable variable) {
+        this(new CaptureTypeImpl((WildcardType) wildcard.getType(), (TypeVariable) variable.getType()), wildcard, variable);
     }
 
-    public AnnotatedCaptureTypeImpl(AnnotatedWildcardType wildcard, AnnotatedTypeVariable variable, AnnotatedType[] upperBounds) {
-        this(wildcard, variable);
-        this.upperBounds = upperBounds;
+    AnnotatedCaptureTypeImpl(CaptureType type, AnnotatedWildcardType wildcard, AnnotatedTypeVariable variable) {
+        this(type, wildcard, variable, null, null);
     }
 
-    public AnnotatedCaptureTypeImpl(AnnotatedWildcardType wildcard, AnnotatedTypeVariable variable) {
+    AnnotatedCaptureTypeImpl(CaptureType type, AnnotatedWildcardType wildcard, AnnotatedTypeVariable variable, AnnotatedType[] upperBounds, Annotation[] annotations) {
+        super(type, annotations != null ? annotations : Stream.concat(stream(wildcard.getAnnotations()), stream(variable.getAnnotations())).toArray(Annotation[]::new));
+        this.type = type;
         this.wildcard = wildcard;
         this.variable = variable;
         this.lowerBounds = wildcard.getAnnotatedLowerBounds();
-        this.type = new CaptureTypeImpl((WildcardType) wildcard.getType(), (TypeVariable) variable.getType());
-        this.annotations = Stream.concat(
-                stream(wildcard.getAnnotations()),
-                stream(variable.getAnnotations())
-        ).collect(Collectors.toMap(Annotation::getClass, annotation -> annotation));
+        this.upperBounds = upperBounds;
         this.declaredAnnotations = Stream.concat(
                 Arrays.stream(wildcard.getDeclaredAnnotations()),
                 Arrays.stream(variable.getDeclaredAnnotations())
@@ -75,22 +69,6 @@ class AnnotatedCaptureTypeImpl implements AnnotatedCaptureType {
         upperBoundsList.toArray(upperBounds);
 
         ((CaptureTypeImpl) type).init(varMap);
-    }
-
-    @Override
-    public Type getType() {
-        return type;
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return (T) annotations.get(annotationClass);
-    }
-
-    @Override
-    public Annotation[] getAnnotations() {
-        return annotations.values().toArray(new Annotation[annotations.size()]);
     }
 
     @Override
@@ -134,22 +112,5 @@ class AnnotatedCaptureTypeImpl implements AnnotatedCaptureType {
     @Override
     public AnnotatedWildcardType getAnnotatedWildcardType() {
         return wildcard;
-    }
-
-    @Override
-    public int hashCode() {
-        return 127 * wildcard.hashCode() ^ variable.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object other) {
-        if (!(other instanceof AnnotatedCaptureType)) {
-            return false;
-        }
-        AnnotatedCaptureType that = ((AnnotatedCaptureType) other);
-        if (!wildcard.equals(that.getAnnotatedWildcardType()) || !variable.equals(that.getAnnotatedTypeVariable())) {
-            return false;
-        }
-        return typeArraysEqual(upperBounds, that.getAnnotatedUpperBounds());
     }
 }

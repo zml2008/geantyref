@@ -858,10 +858,9 @@ public class GenericTypeReflector {
                 return cache.get(key);
             }
             CaptureType capture = ((CaptureType) type);
-            AnnotatedCaptureType annotatedCapture = new AnnotatedCaptureTypeImpl(
+            AnnotatedCaptureType annotatedCapture = new AnnotatedCaptureTypeImpl(capture,
                     ((AnnotatedWildcardType) annotate(capture.getWildcardType(), expandGenerics, cache)),
-                    (AnnotatedTypeVariable) annotate(capture.getTypeVariable(), expandGenerics, cache),
-                    null);
+                    (AnnotatedTypeVariable) annotate(capture.getTypeVariable(), expandGenerics, cache));
 
             cache.put(new CaptureCacheKey(capture), annotatedCapture);
             AnnotatedType[] upperBounds = stream(capture.getUpperBounds())
@@ -918,10 +917,12 @@ public class GenericTypeReflector {
                     ((AnnotatedParameterizedType) original).getAnnotatedActualTypeArguments());
         }
         if (original instanceof AnnotatedCaptureType) {
+            AnnotatedCaptureType capture = (AnnotatedCaptureType) original;
             return (T) new AnnotatedCaptureTypeImpl(
-                    ((AnnotatedCaptureType) original).getAnnotatedWildcardType(),
-                    ((AnnotatedCaptureType) original).getAnnotatedTypeVariable(),
-                    ((AnnotatedCaptureType) original).getAnnotatedUpperBounds(),
+                    (CaptureType) capture.getType(),
+                    capture.getAnnotatedWildcardType(),
+                    capture.getAnnotatedTypeVariable(),
+                    capture.getAnnotatedUpperBounds(),
                     annotations);
         }
         if (original instanceof AnnotatedWildcardType) {
@@ -1004,7 +1005,8 @@ public class GenericTypeReflector {
      */
     public static AnnotatedParameterizedType replaceParameters(AnnotatedParameterizedType type, AnnotatedType[] typeParameters) {
         Type[] rawArguments = stream(typeParameters).map(AnnotatedType::getType).toArray(Type[]::new);
-        ParameterizedType rawType = (ParameterizedType) TypeFactory.parameterizedClass(erase(type.getType()), rawArguments);
+        ParameterizedType inner = (ParameterizedType) type.getType();
+        ParameterizedType rawType = (ParameterizedType) TypeFactory.parameterizedInnerClass(inner.getOwnerType(), erase(inner), rawArguments);
         return new AnnotatedParameterizedTypeImpl(rawType, type.getAnnotations(), typeParameters);
     }
 
@@ -1052,84 +1054,53 @@ public class GenericTypeReflector {
      */
     @SuppressWarnings("unchecked")
     private static <T extends AnnotatedType> T toCanonical(T type, Function<Type, Type> leafTransformer, Map<AnnotatedCaptureCacheKey, AnnotatedType> cache) {
-        if (type instanceof AnnotatedParameterizedType) {
-            AnnotatedType[] params = Arrays.stream(((AnnotatedParameterizedType) type).getAnnotatedActualTypeArguments())
-                    .map(param -> toCanonical(param, leafTransformer, cache))
-                    .toArray(AnnotatedType[]::new);
-            return (T) new AnnotatedParameterizedTypeImpl((ParameterizedType) type.getType(), type.getAnnotations(), params);
-        }
-        if (type instanceof AnnotatedCaptureType) {
-            AnnotatedCaptureType captureType = (AnnotatedCaptureType) type;
-            AnnotatedCaptureCacheKey key = new AnnotatedCaptureCacheKey(captureType);
-            if (cache.containsKey(key)) {
-                return (T) cache.get(key);
+        return (T) transform(type, new TypeVisitor() {
+            @Override
+            protected AnnotatedType visitClass(AnnotatedType type) {
+                return new AnnotatedTypeImpl(leafTransformer.apply(type.getType()), type.getAnnotations());
             }
-            AnnotatedCaptureType annotatedCapture = new AnnotatedCaptureTypeImpl(
-                    toCanonical(captureType.getAnnotatedWildcardType(), leafTransformer, cache),
-                    toCanonical(captureType.getAnnotatedTypeVariable(), leafTransformer, cache),
-                    null, captureType.getAnnotations());
-            cache.put(key, annotatedCapture);
-            AnnotatedType[] upperBounds = Arrays.stream(captureType.getAnnotatedUpperBounds())
-                    .map(bound -> toCanonical(bound, leafTransformer, cache))
-                    .toArray(AnnotatedType[]::new);
-            annotatedCapture.setAnnotatedUpperBounds(upperBounds); //complete the type
-            return (T) annotatedCapture;
-        }
-        if (type instanceof AnnotatedWildcardType) {
-            AnnotatedWildcardType wildcardType = (AnnotatedWildcardType) type;
-            AnnotatedType[] lowerBounds = Arrays.stream(wildcardType.getAnnotatedLowerBounds())
-                    .map(bound -> toCanonical(bound, leafTransformer, cache))
-                    .toArray(AnnotatedType[]::new);
-            AnnotatedType[] upperBounds = Arrays.stream(wildcardType.getAnnotatedUpperBounds())
-                    .map(bound -> toCanonical(bound, leafTransformer, cache))
-                    .toArray(AnnotatedType[]::new);
-            return (T) new AnnotatedWildcardTypeImpl((WildcardType) wildcardType.getType(), wildcardType.getAnnotations(),
-                    lowerBounds, upperBounds);
-        }
-        if (type instanceof AnnotatedTypeVariable) {
-            return (T) new AnnotatedTypeVariableImpl((TypeVariable<?>) type.getType(), type.getAnnotations());
-        }
-        if (type instanceof AnnotatedArrayType) {
-            return (T) new AnnotatedArrayTypeImpl(leafTransformer.apply(type.getType()), type.getAnnotations(),
-                    toCanonical(((AnnotatedArrayType) type).getAnnotatedGenericComponentType(), leafTransformer, cache));
-        }
-        return (T) new AnnotatedTypeImpl(leafTransformer.apply(type.getType()), type.getAnnotations());
+
+            @Override
+            protected AnnotatedType visitArray(AnnotatedArrayType type) {
+                return new AnnotatedArrayTypeImpl(leafTransformer.apply(type.getType()), type.getAnnotations(),
+                        transform(type.getAnnotatedGenericComponentType(), this));
+            }
+        });
     }
 
     private static AnnotatedType expandGenerics(AnnotatedType type) {
+        return transform(type, new TypeVisitor() {
+            @Override
+            public AnnotatedType visitClass(AnnotatedType type) {
+                Class<?> clazz = (Class<?>) type.getType();
+                if (clazz.getTypeParameters().length > 0) {
+                    return expandClassGenerics(clazz);
+                }
+                return type;
+            }
+        });
+    }
+
+    public static AnnotatedType transform(AnnotatedType type, TypeVisitor visitor) {
         if (type instanceof AnnotatedParameterizedType) {
-            AnnotatedType[] params = Arrays.stream(((AnnotatedParameterizedType) type).getAnnotatedActualTypeArguments())
-                    .map(param -> expandGenerics(type))
-                    .toArray(AnnotatedType[]::new);
-            return new AnnotatedParameterizedTypeImpl((ParameterizedType) type.getType(), type.getAnnotations(), params);
+            return visitor.visitParameterizedType((AnnotatedParameterizedType) type);
         }
         if (type instanceof AnnotatedWildcardType) {
-            AnnotatedWildcardType wildcardType = (AnnotatedWildcardType) type;
-            AnnotatedType[] lowerBounds = Arrays.stream(wildcardType.getAnnotatedLowerBounds())
-                    .map(GenericTypeReflector::expandGenerics)
-                    .toArray(AnnotatedType[]::new);
-            AnnotatedType[] upperBounds = Arrays.stream(wildcardType.getAnnotatedUpperBounds())
-                    .map(GenericTypeReflector::expandGenerics)
-                    .toArray(AnnotatedType[]::new);
-            return new AnnotatedWildcardTypeImpl((WildcardType) wildcardType.getType(), wildcardType.getAnnotations(),
-                    lowerBounds, upperBounds);
+            return visitor.visitWildcardType((AnnotatedWildcardType) type);
         }
         if (type instanceof AnnotatedTypeVariable) {
-            AnnotatedType[] bounds = Arrays.stream(((AnnotatedTypeVariable) type).getAnnotatedBounds())
-                    .map(GenericTypeReflector::expandGenerics)
-                    .toArray(AnnotatedType[]::new);
-            return new AnnotatedTypeVariableImpl((TypeVariable<?>) type.getType(), type.getAnnotations(), bounds);
+            return visitor.visitVariable((AnnotatedTypeVariable) type);
         }
         if (type instanceof AnnotatedArrayType) {
-            return new AnnotatedArrayTypeImpl(type.getType(), type.getAnnotations(), expandGenerics(((AnnotatedArrayType) type).getAnnotatedGenericComponentType()));
+            return visitor.visitArray((AnnotatedArrayType) type);
+        }
+        if (type instanceof AnnotatedCaptureType) {
+            return visitor.visitCaptureType((AnnotatedCaptureType) type);
         }
         if (type.getType() instanceof Class) {
-            Class<?> clazz = (Class<?>) type.getType();
-            if (clazz.getTypeParameters().length > 0) {
-                return expandClassGenerics(clazz);
-            }
+            return visitor.visitClass(type);
         }
-        return type;
+        return visitor.visitUnmatched(type);
     }
 
     private static AnnotatedParameterizedType expandClassGenerics(Class<?> type) {
@@ -1174,7 +1145,7 @@ public class GenericTypeReflector {
         return 31 * typeHash ^ annotationHash;
     }
 
-    private static int hashCode(Stream<Annotation> annotations) {
+    static int hashCode(Stream<Annotation> annotations) {
         return annotations
                 .mapToInt(a -> 31 * a.annotationType().hashCode() ^ a.hashCode())
                 .reduce(0, (x,y) -> 127 * x ^ y);
@@ -1218,7 +1189,7 @@ public class GenericTypeReflector {
      *
      * <p>See {@link #annotate(Type, boolean, Map)}</p>
      */
-    private static class CaptureCacheKey {
+    static class CaptureCacheKey {
         CaptureType capture;
 
         CaptureCacheKey(CaptureType capture) {

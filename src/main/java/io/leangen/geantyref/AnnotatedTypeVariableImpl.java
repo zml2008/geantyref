@@ -9,9 +9,6 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.AnnotatedTypeVariable;
 import java.lang.reflect.TypeVariable;
-import java.util.Arrays;
-
-import static io.leangen.geantyref.GenericTypeReflector.typeArraysEqual;
 
 class AnnotatedTypeVariableImpl extends AnnotatedTypeImpl implements AnnotatedTypeVariable {
 
@@ -22,50 +19,31 @@ class AnnotatedTypeVariableImpl extends AnnotatedTypeImpl implements AnnotatedTy
     }
 
     AnnotatedTypeVariableImpl(TypeVariable<?> type, Annotation[] annotations) {
-        this(type, annotations, type.getAnnotatedBounds());
-    }
-
-    AnnotatedTypeVariableImpl(TypeVariable<?> type, Annotation[] annotations, AnnotatedType[] annotatedBounds) {
         super(type, annotations);
+        AnnotatedType[] annotatedBounds =  type.getAnnotatedBounds();
         if (annotatedBounds == null || annotatedBounds.length == 0) {
             annotatedBounds = new AnnotatedType[0];
         }
-        validateBounds(type, annotatedBounds);
+        this.annotatedBounds = annotatedBounds;
+    }
+
+    void init(AnnotatedType[] annotatedBounds) {
+        this.type = new TypeVariableImpl<>((TypeVariable<?>) this.type, this.getAnnotations(), annotatedBounds);
         this.annotatedBounds = annotatedBounds;
     }
 
     @Override
     public AnnotatedType[] getAnnotatedBounds() {
-        return annotatedBounds;
+        return annotatedBounds.clone();
     }
 
     @Override
     public boolean equals(Object other) {
-        if (!(other instanceof AnnotatedTypeVariable) || !super.equals(other)) {
-            return false;
-        }
-        return typeArraysEqual(annotatedBounds, ((AnnotatedTypeVariable) other).getAnnotatedBounds());
-    }
-
-    @Override
-    public int hashCode() {
-        return 127 * super.hashCode() ^ GenericTypeReflector.hashCode(annotatedBounds);
+        return other instanceof AnnotatedTypeVariable && super.equals(other);
     }
 
     @Override
     public String toString() {
-        return annotationsString() + ((TypeVariable) type).getName() + " extends " + typesString(annotatedBounds);
-    }
-
-    private static void validateBounds(TypeVariable type, AnnotatedType[] bounds) {
-        if (type.getBounds().length != bounds.length) {
-            throw new IllegalArgumentException("Incompatible bounds " + Arrays.toString(bounds) + " for type " + type.toString());
-        }
-        for (int i = 0; i < type.getBounds().length; i++) {
-            if (GenericTypeReflector.erase(type.getBounds()[i]) != GenericTypeReflector.erase(bounds[i].getType())) {
-                throw new IllegalArgumentException("Bound " + bounds[i].getType() + " incompatible with "
-                        + type.getBounds()[i] + " in type " + type.toString());
-            }
-        }
+        return annotationsString() + ((TypeVariable) type).getName();
     }
 }

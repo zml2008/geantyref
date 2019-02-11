@@ -76,7 +76,7 @@ public class TypeVariableImpl<D extends GenericDeclaration> implements TypeVaria
 
     @Override
     public Annotation[] getAnnotations() {
-        return annotations.values().toArray(new Annotation[annotations.size()]);
+        return annotations.values().toArray(new Annotation[0]);
     }
 
     //should this maybe return only annotations directly on the variable?
@@ -105,18 +105,12 @@ public class TypeVariableImpl<D extends GenericDeclaration> implements TypeVaria
 
     @Override
     public String toString() {
-        return annotationsString() + this.getName() + " extends " + typesString(bounds);
+        return annotationsString() + this.getName();
     }
 
     private String annotationsString() {
         return annotations.isEmpty() ? "" : annotations.values().stream()
                 .map(Annotation::toString)
                 .collect(Collectors.joining(", ")) + " ";
-    }
-
-    String typesString(AnnotatedType[] types) {
-        return Arrays.stream(types)
-                .map(Object::toString)
-                .collect(Collectors.joining(", "));
     }
 }

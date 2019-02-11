@@ -5,6 +5,8 @@
 
 package io.leangen.geantyref;
 
+import static org.junit.Assert.assertNotEquals;
+
 import junit.framework.TestCase;
 
 import java.io.Serializable;
@@ -652,13 +654,13 @@ public abstract class AbstractGenericsReflectorTest extends TestCase {
         };
         TypeToken<?> capture1 = getF(bw);
         TypeToken<?> capture2 = getF(bw);
-        assertFalse(capture1.getType().equals(capture2.getType()));
+        assertNotEquals(capture1.getType(), capture2.getType());
         // if these were equal, this would be valid:
 //		Box<?> b1 = new Box<Integer>();
 //		Box<?> b2 = new Box<String>();
 //		b1.f = b2.f;
         // but the capture is still equal to itself
-        assertTrue(capture1.equals(capture1));
+        assertEquals(capture1, capture1);
     }
 
     public void testCaptureBeforeReplaceSupertype() {
@@ -679,8 +681,8 @@ public abstract class AbstractGenericsReflectorTest extends TestCase {
         TypeToken<?> edgeOfNode = getFieldType(node.getType(), e);
         TypeToken<?> nodeOfEdgeOfNode = getFieldType(edgeOfNode.getType(), n);
         TypeToken<?> edgeOfNodeOfEdgeOfNode = getFieldType(nodeOfEdgeOfNode.getType(), e);
-        assertEquals(edgeOfNode, edgeOfNodeOfEdgeOfNode);
-        assertFalse(node.equals(nodeOfEdgeOfNode)); // node is not captured, nodeOfEdgeOfNode is
+        assertEquals(edgeOfNode.getType(), edgeOfNodeOfEdgeOfNode.getType());
+        assertNotEquals(node, nodeOfEdgeOfNode); // node is not captured, nodeOfEdgeOfNode is
     }
 
     /**

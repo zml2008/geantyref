@@ -36,8 +36,7 @@ class CaptureTypeImpl implements CaptureType {
      * other: we need the capture of the argument.
      */
     void init(VarMap varMap) {
-        ArrayList<Type> upperBoundsList = new ArrayList<>();
-        upperBoundsList.addAll(Arrays.asList(varMap.map(variable.getBounds())));
+        ArrayList<Type> upperBoundsList = new ArrayList<>(Arrays.asList(varMap.map(variable.getBounds())));
 
         List<Type> wildcardUpperBounds = Arrays.asList(wildcard.getUpperBounds());
         if (wildcardUpperBounds.size() > 0 && wildcardUpperBounds.get(0) == Object.class) {
@@ -83,4 +82,5 @@ class CaptureTypeImpl implements CaptureType {
     public String toString() {
         return "capture of " + wildcard;
     }
+
 }

@@ -69,13 +69,12 @@ public class ToStringTest {
 
     @Test
     public void variableTypeTest() {
-        TypeVariable var = P.class.getTypeParameters()[0];
+        TypeVariable<?> var = P.class.getTypeParameters()[0];
         AnnotatedType[] bounds = Arrays.stream(var.getAnnotatedBounds())
                 .map(GenericTypeReflector::toCanonical)
                 .toArray(AnnotatedType[]::new);
-        AnnotatedType type = new AnnotatedTypeVariableImpl(var, var.getAnnotations(), bounds);
-        assertEquals("@io.leangen.geantyref.Annotations$A3() " +
-                "T extends java.lang.Number, @io.leangen.geantyref.Annotations$A4() java.io.Serializable", type.toString());
+        AnnotatedType type = new AnnotatedTypeVariableImpl(new TypeVariableImpl<>(var, bounds), var.getAnnotations());
+        assertEquals("@io.leangen.geantyref.Annotations$A3() T", type.toString());
     }
 
     @Test
