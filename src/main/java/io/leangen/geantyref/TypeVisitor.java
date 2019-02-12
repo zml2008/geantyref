@@ -12,6 +12,7 @@ import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
 import java.lang.reflect.WildcardType;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
@@ -19,6 +20,7 @@ import java.util.Map;
 public abstract class TypeVisitor {
 
 	private final Map<TypeVariable, AnnotatedTypeVariable> varCache = new IdentityHashMap<>();
+	private final Map<AnnotatedCaptureCacheKey, AnnotatedType> captureCache = new HashMap<>();
 
 	protected AnnotatedType visitParameterizedType(AnnotatedParameterizedType type) {
 		AnnotatedType[] params = Arrays.stream(type.getAnnotatedActualTypeArguments())
@@ -62,7 +64,20 @@ public abstract class TypeVisitor {
 	}
 
 	protected AnnotatedType visitCaptureType(AnnotatedCaptureType type) {
-		return type;
+		AnnotatedCaptureCacheKey key = new AnnotatedCaptureCacheKey(type);
+		if (captureCache.containsKey(key)) {
+			return captureCache.get(key);
+		}
+		AnnotatedCaptureType annotatedCapture = new AnnotatedCaptureTypeImpl((CaptureType) type.getType(),
+				(AnnotatedWildcardType) transform(type.getAnnotatedWildcardType(), this),
+				(AnnotatedTypeVariable) transform(type.getAnnotatedTypeVariable(), this),
+				null, type.getAnnotations());
+		captureCache.put(key, annotatedCapture);
+		AnnotatedType[] upperBounds = Arrays.stream(type.getAnnotatedUpperBounds())
+				.map(bound -> transform(bound, this))
+				.toArray(AnnotatedType[]::new);
+		annotatedCapture.setAnnotatedUpperBounds(upperBounds); //complete the type
+		return annotatedCapture;
 	}
 
 	protected AnnotatedType visitClass(AnnotatedType type) {
@@ -71,5 +86,31 @@ public abstract class TypeVisitor {
 
 	protected AnnotatedType visitUnmatched(AnnotatedType type) {
 		return type;
+	}
+
+	private static class AnnotatedCaptureCacheKey {
+		AnnotatedCaptureType capture;
+		CaptureType raw;
+
+		AnnotatedCaptureCacheKey(AnnotatedCaptureType capture) {
+			this.capture = capture;
+			this.raw = (CaptureType) capture.getType();
+		}
+
+		@Override
+		public int hashCode() {
+			return 127 * raw.getWildcardType().hashCode() ^ raw.getTypeVariable().hashCode() ^ GenericTypeReflector.hashCode(Arrays.stream(capture.getAnnotations()));
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj) return true;
+			if (!(obj instanceof AnnotatedCaptureCacheKey)) return false;
+
+			AnnotatedCaptureCacheKey that = ((AnnotatedCaptureCacheKey) obj);
+			return this.capture == that.capture ||
+					(new GenericTypeReflector.CaptureCacheKey(raw).equals(new GenericTypeReflector.CaptureCacheKey(that.raw))
+							&& Arrays.equals(capture.getAnnotations(), that.capture.getAnnotations()));
+		}
 	}
 }
