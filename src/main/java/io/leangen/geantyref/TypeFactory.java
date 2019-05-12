@@ -45,12 +45,24 @@ public class TypeFactory {
         return parameterizedInnerClass(null, clazz, arguments);
     }
 
+    public static AnnotatedType annotatedClass(Class<?> clazz, Annotation[] annotations) {
+        return parameterizedAnnotatedClass(clazz, annotations);
+    }
+
     public static AnnotatedType parameterizedAnnotatedClass(Class<?> clazz, Annotation[] annotations, AnnotatedType... arguments) {
+        return parameterizedAnnotatedInnerClass(null, clazz, annotations, arguments);
+    }
+
+    public static AnnotatedType annotatedInnerClass(Type owner, Class<?> clazz, Annotation[] annotations) {
+        return parameterizedAnnotatedInnerClass(owner, clazz, annotations);
+    }
+
+    public static AnnotatedType parameterizedAnnotatedInnerClass(Type owner, Class<?> clazz, Annotation[] annotations, AnnotatedType... arguments) {
         if (arguments == null || arguments.length == 0) {
             return GenericTypeReflector.annotate(clazz, annotations);
         }
         Type[] typeArguments = Arrays.stream(arguments).map(AnnotatedType::getType).toArray(Type[]::new);
-        return new AnnotatedParameterizedTypeImpl((ParameterizedType) parameterizedClass(clazz, typeArguments), annotations, arguments);
+        return new AnnotatedParameterizedTypeImpl((ParameterizedType) parameterizedInnerClass(owner, clazz, typeArguments), annotations, arguments);
     }
 
     public static AnnotatedParameterizedType parameterizedAnnotatedType(ParameterizedType type, Annotation[] typeAnnotations, Annotation[]... argumentAnnotations) {
