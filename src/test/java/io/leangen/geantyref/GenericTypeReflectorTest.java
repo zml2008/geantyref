@@ -112,6 +112,20 @@ public class GenericTypeReflectorTest extends AbstractGenericsReflectorTest {
         assertEquals(String.class, subType.getAnnotatedActualTypeArguments()[1].getType());
     }
 
+    public void testGetExactSubTypeIndirect() {
+        AnnotatedParameterizedType parent = (AnnotatedParameterizedType) new TypeToken<P<List<String>, List<Map<String, Integer>>>>(){}.getAnnotatedType();
+        AnnotatedParameterizedType subType = (AnnotatedParameterizedType) getExactSubType(parent, L.class);
+        assertNotNull(subType);
+        assertEquals(Integer.class, subType.getAnnotatedActualTypeArguments()[0].getType());
+        assertEquals(String.class, subType.getAnnotatedActualTypeArguments()[1].getType());
+    }
+
+    public void testGetExactSubTypeShapeMismatch() {
+        AnnotatedParameterizedType parent = (AnnotatedParameterizedType) new TypeToken<P<List<String>, Map<String, Integer>>>(){}.getAnnotatedType();
+        AnnotatedParameterizedType subType = (AnnotatedParameterizedType) getExactSubType(parent, L.class);
+        assertNull(subType);
+    }
+
     public void testGetExactSubTypeUnresolvable() {
         AnnotatedParameterizedType parent = (AnnotatedParameterizedType) new TypeToken<P<String, Integer>>(){}.getAnnotatedType();
         AnnotatedType resolved = GenericTypeReflector.getExactSubType(parent, C1.class);
@@ -202,6 +216,7 @@ public class GenericTypeReflectorTest extends AbstractGenericsReflectorTest {
 
     private class N {}
     private class P<S, K> extends N {}
+    private class L<S, K> extends P<List<K>, List<Map<K, S>>> {}
     private class M<U, R> extends P<U, R> {}
     private class C<X, Y> extends M<Y, X> {}
     private class C1<X, Y, Z> extends M<Y, X> {}

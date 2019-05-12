@@ -326,16 +326,13 @@ public class GenericTypeReflector {
         AnnotatedParameterizedType matched = (AnnotatedParameterizedType) getExactSuperType(annotatedSubType, rawSuperType);
         if (matched == null) return null;
         VarMap varMap = new VarMap();
-        for (int i = 0; i < parameterizedSuperType.getAnnotatedActualTypeArguments().length; i++) {
-            Type var = matched.getAnnotatedActualTypeArguments()[i].getType();
-            if (var instanceof TypeVariable && ((TypeVariable) var).getGenericDeclaration() == searchSubClass) {
-                varMap.add(((TypeVariable) var), parameterizedSuperType.getAnnotatedActualTypeArguments()[i]);
-            }
-        }
         try {
+            extractVariables(parameterizedSuperType, matched, searchSubClass, varMap);
             return varMap.map(annotatedSubType);
         } catch (UnresolvedTypeVariableException e) {
             return annotate(searchSubClass);
+        } catch (IllegalArgumentException e) {
+            return null; //Type shape did not match
         }
     }
 
@@ -495,6 +492,22 @@ public class GenericTypeReflector {
             return true;
         } else {
             return containingType.equals(containedType);
+        }
+    }
+
+    private static void extractVariables(AnnotatedParameterizedType resolvedTyped, AnnotatedParameterizedType unresolvedType, Class<?> declaringClass, VarMap variables) {
+        for (int i = 0; i < resolvedTyped.getAnnotatedActualTypeArguments().length; i++) {
+            final AnnotatedType unresolvedParam = unresolvedType.getAnnotatedActualTypeArguments()[i];
+            final AnnotatedType resolvedParam = resolvedTyped.getAnnotatedActualTypeArguments()[i];
+            final Type var = unresolvedParam.getType();
+            if (var instanceof TypeVariable && ((TypeVariable) var).getGenericDeclaration() == declaringClass) {
+                variables.add(((TypeVariable) var), resolvedParam);
+            } else if (unresolvedParam instanceof AnnotatedParameterizedType) {
+                if (!(resolvedParam instanceof AnnotatedParameterizedType)) {
+                    throw new IllegalArgumentException("The provided types do not match in shape");
+                }
+                extractVariables((AnnotatedParameterizedType) resolvedParam, (AnnotatedParameterizedType) unresolvedParam, declaringClass, variables);
+            }
         }
     }
 
