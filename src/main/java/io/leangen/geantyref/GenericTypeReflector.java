@@ -503,7 +503,7 @@ public class GenericTypeReflector {
             if (var instanceof TypeVariable && ((TypeVariable) var).getGenericDeclaration() == declaringClass) {
                 variables.add(((TypeVariable) var), resolvedParam);
             } else if (unresolvedParam instanceof AnnotatedParameterizedType) {
-                if (!(resolvedParam instanceof AnnotatedParameterizedType)) {
+                if (!(resolvedParam instanceof AnnotatedParameterizedType) || !erase(unresolvedParam.getType()).equals(erase(resolvedParam.getType()))) {
                     throw new IllegalArgumentException("The provided types do not match in shape");
                 }
                 extractVariables((AnnotatedParameterizedType) resolvedParam, (AnnotatedParameterizedType) unresolvedParam, declaringClass, variables);

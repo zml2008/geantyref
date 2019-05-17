@@ -126,6 +126,12 @@ public class GenericTypeReflectorTest extends AbstractGenericsReflectorTest {
         assertNull(subType);
     }
 
+    public void testGetExactSubTypeShapeMismatch2() {
+        AnnotatedParameterizedType parent = (AnnotatedParameterizedType) new TypeToken<P<Optional<String>, List<Map<String, Integer>>>>(){}.getAnnotatedType();
+        AnnotatedParameterizedType subType = (AnnotatedParameterizedType) getExactSubType(parent, L.class);
+        assertNull(subType);
+    }
+
     public void testGetExactSubTypeUnresolvable() {
         AnnotatedParameterizedType parent = (AnnotatedParameterizedType) new TypeToken<P<String, Integer>>(){}.getAnnotatedType();
         AnnotatedType resolved = GenericTypeReflector.getExactSubType(parent, C1.class);
