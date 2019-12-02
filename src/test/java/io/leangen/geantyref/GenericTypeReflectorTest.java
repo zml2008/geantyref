@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -138,7 +139,7 @@ public class GenericTypeReflectorTest extends AbstractGenericsReflectorTest {
         assertNotNull(resolved);
         assertEquals(C1.class, resolved.getType());
     }
-    
+
     public void testGetExactSubTypeUnresolvable2() {
         AnnotatedType parent = new TypeToken<N>(){}.getAnnotatedType();
         AnnotatedType resolved = GenericTypeReflector.getExactSubType(parent, C1.class);
@@ -215,6 +216,16 @@ public class GenericTypeReflectorTest extends AbstractGenericsReflectorTest {
         assertAnnotationsPresent(value, A1.class, A3.class);
     }
 
+    public void testCanonicalTypes() {
+        AnnotatedType inner = new TypeToken<Outer.Inner>(){}.getAnnotatedType();
+        AnnotatedType innerCanonical = GenericTypeReflector.toCanonical(inner);
+        assertAnnotationsPresent(innerCanonical, A1.class);
+
+        AnnotatedType innermost = new TypeToken<Outer.Inner.Innermost>(){}.getAnnotatedType();
+        AnnotatedType innermostCanonical = GenericTypeReflector.toCanonical(innermost);
+        assertAnnotationsPresent(innermostCanonical, A2.class);
+    }
+
     @SafeVarargs
     private static void assertAnnotationsPresent(AnnotatedType type, Class<? extends Annotation>... annotations) {
         assertArrayEquals(annotations, Arrays.stream(type.getAnnotations()).map(Annotation::annotationType).toArray());
@@ -238,4 +249,6 @@ public class GenericTypeReflectorTest extends AbstractGenericsReflectorTest {
 
     private static AnnotatedType t1 = new TypeToken<@A1 Optional<@A2 Map<@A3 String, @A4 Integer @A5 []>>>(){}.getAnnotatedType();
     private static AnnotatedType t2 = new TypeToken<@A5 Optional<@A4 Map<@A2 String, @A3 Integer @A1 []>>>(){}.getAnnotatedType();
+
+    private class Outer { @A1 class Inner { @A2 class Innermost {}}}
 }

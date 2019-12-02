@@ -303,7 +303,7 @@ public class GenericTypeReflector {
     public static AnnotatedType getExactSubType(AnnotatedType superType, Class<?> searchSubClass) {
         Type subType = searchSubClass;
         if (searchSubClass.getTypeParameters().length > 0) {
-            subType = TypeFactory.parameterizedClass(searchSubClass, (Type[]) searchSubClass.getTypeParameters());
+            subType = TypeFactory.parameterizedClass(searchSubClass, searchSubClass.getTypeParameters());
         }
         AnnotatedType annotatedSubType = annotate(subType);
         Class<?> rawSuperType = erase(superType.getType());
@@ -1017,10 +1017,15 @@ public class GenericTypeReflector {
      * @return The new parameterized type
      */
     public static AnnotatedParameterizedType replaceParameters(AnnotatedParameterizedType type, AnnotatedType[] typeParameters) {
+        return replaceParameters(type, new Annotation[0], typeParameters);
+    }
+
+    //TODO JDK bug mitigation - remove this overload (leave the 2-param version only) when no longer needed
+    private static AnnotatedParameterizedType replaceParameters(AnnotatedParameterizedType type, Annotation[] annotations, AnnotatedType[] typeParameters) {
         Type[] rawArguments = stream(typeParameters).map(AnnotatedType::getType).toArray(Type[]::new);
         ParameterizedType inner = (ParameterizedType) type.getType();
         ParameterizedType rawType = (ParameterizedType) TypeFactory.parameterizedInnerClass(inner.getOwnerType(), erase(inner), rawArguments);
-        return new AnnotatedParameterizedTypeImpl(rawType, type.getAnnotations(), typeParameters);
+        return new AnnotatedParameterizedTypeImpl(rawType, merge(type.getAnnotations(), annotations), typeParameters);
     }
 
     /**
@@ -1032,7 +1037,7 @@ public class GenericTypeReflector {
      * @return A type functionally equivalent to the given one, but in the canonical form
      */
     public static <T extends AnnotatedType> T toCanonical(T type) {
-        return toCanonical(type, Function.identity(), new HashMap<>());
+        return toCanonical(type, Function.identity());
     }
 
     /**
@@ -1044,7 +1049,7 @@ public class GenericTypeReflector {
      * @return A type functionally equivalent to the given one, but in the canonical form
      */
     public static <T extends AnnotatedType> T toCanonicalBoxed(T type) {
-        return toCanonical(type, GenericTypeReflector::box, new HashMap<>());
+        return toCanonical(type, GenericTypeReflector::box);
     }
 
     /**
@@ -1055,9 +1060,6 @@ public class GenericTypeReflector {
      *
      * @param type The type to annotate
      * @param leafTransformer The transformer function to apply to leaf types (e.g. to box primitives)
-     * @param cache The cache for already encountered {@link AnnotatedCaptureType}s. Necessary because
-     *       {@link AnnotatedCaptureType}s can have infinitely recursive structure.
-     *
      * @return Type whose structure has been recursively annotated
      *
      * <p>See {@link #toCanonical(AnnotatedType)}</p>
@@ -1066,17 +1068,38 @@ public class GenericTypeReflector {
      * <p>See {@link CaptureType}</p>
      */
     @SuppressWarnings("unchecked")
-    private static <T extends AnnotatedType> T toCanonical(T type, Function<Type, Type> leafTransformer, Map<AnnotatedCaptureCacheKey, AnnotatedType> cache) {
+    private static <T extends AnnotatedType> T toCanonical(T type, Function<Type, Type> leafTransformer) {
         return (T) transform(type, new TypeVisitor() {
             @Override
             protected AnnotatedType visitClass(AnnotatedType type) {
-                return new AnnotatedTypeImpl(leafTransformer.apply(type.getType()), type.getAnnotations());
+                Annotation[] annotations = type.getAnnotations();
+                Class raw = (Class) type.getType();
+                //TODO JDK bug mitigation - remove when no longer needed
+                if (raw.getEnclosingClass() != null) {
+                    annotations = merge(annotations, raw.getAnnotations());
+                }
+                return new AnnotatedTypeImpl(leafTransformer.apply(type.getType()), annotations);
             }
 
             @Override
             protected AnnotatedType visitArray(AnnotatedArrayType type) {
                 return new AnnotatedArrayTypeImpl(leafTransformer.apply(type.getType()), type.getAnnotations(),
                         transform(type.getAnnotatedGenericComponentType(), this));
+            }
+
+            @Override
+            protected AnnotatedType visitParameterizedType(AnnotatedParameterizedType type) {
+                AnnotatedType[] params = Arrays.stream(type.getAnnotatedActualTypeArguments())
+                        .map(param -> transform(param, this))
+                        .toArray(AnnotatedType[]::new);
+
+                //TODO JDK bug mitigation - remove when no longer needed
+                if (type.getType() instanceof ParameterizedType && ((ParameterizedType) type.getType()).getOwnerType() != null) {
+                    Class raw = erase(type.getType());
+                    return GenericTypeReflector.replaceParameters(type, raw.getAnnotations(), params);
+                }
+
+                return GenericTypeReflector.replaceParameters(type, params);
             }
         });
     }
