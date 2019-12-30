@@ -1020,7 +1020,6 @@ public class GenericTypeReflector {
         return replaceParameters(type, new Annotation[0], typeParameters);
     }
 
-    //TODO JDK bug mitigation - remove this overload (leave the 2-param version only) when no longer needed
     private static AnnotatedParameterizedType replaceParameters(AnnotatedParameterizedType type, Annotation[] annotations, AnnotatedType[] typeParameters) {
         Type[] rawArguments = stream(typeParameters).map(AnnotatedType::getType).toArray(Type[]::new);
         ParameterizedType inner = (ParameterizedType) type.getType();
@@ -1073,11 +1072,8 @@ public class GenericTypeReflector {
             @Override
             protected AnnotatedType visitClass(AnnotatedType type) {
                 Annotation[] annotations = type.getAnnotations();
-                Class raw = (Class) type.getType();
-                //TODO JDK bug mitigation - remove when no longer needed
-                if (raw.getEnclosingClass() != null) {
-                    annotations = merge(annotations, raw.getAnnotations());
-                }
+                Class<?> raw = (Class<?>) type.getType();
+                annotations = merge(annotations, raw.getAnnotations());
                 return new AnnotatedTypeImpl(leafTransformer.apply(type.getType()), annotations);
             }
 
@@ -1093,13 +1089,8 @@ public class GenericTypeReflector {
                         .map(param -> transform(param, this))
                         .toArray(AnnotatedType[]::new);
 
-                //TODO JDK bug mitigation - remove when no longer needed
-                if (type.getType() instanceof ParameterizedType && ((ParameterizedType) type.getType()).getOwnerType() != null) {
-                    Class raw = erase(type.getType());
-                    return GenericTypeReflector.replaceParameters(type, raw.getAnnotations(), params);
-                }
-
-                return GenericTypeReflector.replaceParameters(type, params);
+                Class<?> raw = (Class<?>)((ParameterizedType) type.getType()).getRawType();
+                return GenericTypeReflector.replaceParameters(type, raw.getAnnotations(), params);
             }
         });
     }

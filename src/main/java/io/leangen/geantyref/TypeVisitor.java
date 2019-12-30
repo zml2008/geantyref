@@ -38,7 +38,9 @@ public abstract class TypeVisitor {
 				.map(bound -> transform(bound, this))
 				.toArray(AnnotatedType[]::new);
 		WildcardType inner = new WildcardTypeImpl(
-				Arrays.stream(upperBounds).map(AnnotatedType::getType).toArray(Type[]::new),
+				upperBounds.length > 0
+						? Arrays.stream(upperBounds).map(AnnotatedType::getType).toArray(Type[]::new)
+						: new Type[] {Object.class},
 				Arrays.stream(lowerBounds).map(AnnotatedType::getType).toArray(Type[]::new));
 		return new AnnotatedWildcardTypeImpl(inner, type.getAnnotations(),
 				lowerBounds, upperBounds);

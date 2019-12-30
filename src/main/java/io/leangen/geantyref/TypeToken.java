@@ -23,6 +23,7 @@ import java.lang.reflect.Type;
  * @author Wouter Coekaerts {@literal (wouter@coekaerts.be)}
  */
 public abstract class TypeToken<T> {
+
     private final AnnotatedType type;
 
     /**
@@ -65,6 +66,10 @@ public abstract class TypeToken<T> {
 
     public AnnotatedType getAnnotatedType() {
         return type;
+    }
+
+    public AnnotatedType getCanonicalType() {
+        return GenericTypeReflector.toCanonical(type);
     }
 
     private AnnotatedType extractType() {
