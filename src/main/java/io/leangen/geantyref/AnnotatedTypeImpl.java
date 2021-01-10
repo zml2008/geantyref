@@ -31,6 +31,19 @@ class AnnotatedTypeImpl implements AnnotatedType {
         }
     }
 
+    // @Override // added in Java 9
+    public AnnotatedType getAnnotatedOwnerType() {
+        if (!(type instanceof Class<?>)) {
+            throw new IllegalArgumentException("Should be handled by a subtype");
+        }
+        final Class<?> ownerType = ((Class<?>) type).getEnclosingClass();
+        if (ownerType == null) {
+            return null;
+        }
+
+        return GenericTypeReflector.annotate(ownerType, this.annotations.values().toArray(new Annotation[0]));
+    }
+
     @Override
     public Type getType() {
         return type;

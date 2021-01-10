@@ -28,6 +28,11 @@ class AnnotatedArrayTypeImpl extends AnnotatedTypeImpl implements AnnotatedArray
         return componentType;
     }
 
+    @Override // Java 9 API
+    public AnnotatedType getAnnotatedOwnerType() {
+        return null; // by method spec
+    }
+
     @Override
     public boolean equals(Object other) {
         return other instanceof AnnotatedArrayType

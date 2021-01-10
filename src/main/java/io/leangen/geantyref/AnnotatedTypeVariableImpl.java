@@ -37,6 +37,11 @@ class AnnotatedTypeVariableImpl extends AnnotatedTypeImpl implements AnnotatedTy
         return annotatedBounds.clone();
     }
 
+    @Override // Java 9 API
+    public AnnotatedType getAnnotatedOwnerType() {
+        return null; // by method spec
+    }
+
     @Override
     public boolean equals(Object other) {
         return other instanceof AnnotatedTypeVariable && super.equals(other);

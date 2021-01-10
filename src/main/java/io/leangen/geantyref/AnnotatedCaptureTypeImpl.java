@@ -72,6 +72,11 @@ class AnnotatedCaptureTypeImpl extends AnnotatedTypeImpl implements AnnotatedCap
     }
 
     @Override
+    public AnnotatedType getAnnotatedOwnerType() {
+        return null;
+    }
+
+    @Override
     public Annotation[] getDeclaredAnnotations() {
         return declaredAnnotations;
     }

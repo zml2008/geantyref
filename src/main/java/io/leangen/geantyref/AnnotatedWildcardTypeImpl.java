@@ -42,6 +42,11 @@ class AnnotatedWildcardTypeImpl extends AnnotatedTypeImpl implements AnnotatedWi
         return upperBounds;
     }
 
+    @Override // Java 9 API
+    public AnnotatedType getAnnotatedOwnerType() {
+        return null; // by method spec
+    }
+
     @Override
     public boolean equals(Object other) {
         if (!(other instanceof AnnotatedWildcardType) || !super.equals(other)) {

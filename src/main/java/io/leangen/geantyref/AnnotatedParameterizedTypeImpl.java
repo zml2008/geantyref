@@ -9,6 +9,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedParameterizedType;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 
 import static io.leangen.geantyref.GenericTypeReflector.typeArraysEqual;
 
@@ -19,6 +20,15 @@ class AnnotatedParameterizedTypeImpl extends AnnotatedTypeImpl implements Annota
     AnnotatedParameterizedTypeImpl(ParameterizedType rawType, Annotation[] annotations, AnnotatedType[] typeArguments) {
         super(rawType, annotations);
         this.typeArguments = typeArguments;
+    }
+
+    @Override
+    public AnnotatedType getAnnotatedOwnerType() {
+        Type ownerType = ((ParameterizedType) type).getOwnerType();
+        if (ownerType == null) {
+            return null;
+        }
+        return GenericTypeReflector.annotate(ownerType, annotations.values().toArray(new Annotation[0]));
     }
 
     @Override
